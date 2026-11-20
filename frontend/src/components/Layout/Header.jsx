@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { Search, Bell, HelpCircle, Menu, X, User, ChevronDown } from 'lucide-react';
+import { roleLabel } from '../../utils/roleLabels';
 
 export const Header = ({ userName, role, notifications, onMenuClick }) => {
   const [isSearchOpen, setIsSearchOpen] = useState(false);
@@ -75,7 +76,7 @@ export const Header = ({ userName, role, notifications, onMenuClick }) => {
               </div>
               <div className="hidden lg:block">
                 <p className="text-sm font-medium text-gray-900">{userName}</p>
-                <p className="text-xs text-gray-500">{role}</p>
+                <p className="text-xs text-gray-500">{roleLabel(role)}</p>
               </div>
               <ChevronDown className="w-4 h-4 text-gray-400 hidden lg:block group-hover:text-gray-600" />
             </div>

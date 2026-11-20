@@ -19,13 +19,15 @@ const UserModel = createPgModel('users', {
   statics: {
     async generateEmployeeId(role) {
       const prefix = role === 'CEO' ? 'CEO' :
-                     role === 'COO' ? 'COO' :
-                     role === 'Manager' ? 'MGR' :
+                     role === 'COO' ? 'DIR' :
+                     role === 'Manager' ? 'PM' :
                      role === 'Team Lead' ? 'LD' :
                      role === 'CO Head' || role === 'Co-Head' ? 'COH' :
-                     role === 'HR' ? 'HR' : 'EMP';
-      const count = await UserModel.countDocuments({ employeeId: { $regex: `^${prefix}` } });
-      return `${prefix}${String(count + 1).padStart(3, '0')}`;
+                     role === 'HR' ? 'HR' : 'INT';
+      // Next number after the highest existing one (counting would reuse IDs after someone is removed).
+      const existing = await UserModel.find({ employeeId: { $regex: `^${prefix}\\d+$` } });
+      const highest = existing.reduce((max, u) => Math.max(max, Number(String(u.employeeId).slice(prefix.length)) || 0), 0);
+      return `${prefix}${String(highest + 1).padStart(3, '0')}`;
     }
   },
   preSave: [

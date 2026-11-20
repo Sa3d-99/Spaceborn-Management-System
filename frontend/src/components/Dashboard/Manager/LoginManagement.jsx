@@ -1,6 +1,7 @@
 // src/components/Dashboard/Manager/LoginManagement.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const LoginManagement = ({ userRole }) => {
   const [activeSessions, setActiveSessions] = useState([]);
@@ -204,7 +205,7 @@ const LoginManagement = ({ userRole }) => {
               </td>
               <td className="px-4 py-3">
                 <span className="px-2 py-1 text-xs rounded-full bg-green-100 text-green-700">
-                  {session.role}
+                  {roleLabel(session.role)}
                 </span>
               </td>
               <td className="px-4 py-3 text-sm text-gray-600">{session.loginTime}</td>

@@ -9,7 +9,9 @@
     "start": "node backend/server.js",
     "seed": "node backend/seed.js",
     "dev:backend": "npm run dev --prefix backend",
-    "dev:frontend": "npm start --prefix frontend"
+    "dev:frontend": "npm start --prefix frontend",
+    "import:employees": "node backend/scripts/importEmployees.js",
+    "db:reset": "node backend/scripts/resetDatabase.js"
   },
   "keywords": [
     "management-system",

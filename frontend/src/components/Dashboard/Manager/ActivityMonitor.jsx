@@ -5,6 +5,8 @@ import employeeService from '../../../services/employeeService';
 import reportService from '../../../services/reportService';
 import leaveService from '../../../services/leaveService';
 import taskService from '../../../services/taskService';
+import { DEPARTMENTS } from '../../../utils/departments';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const ActivityMonitor = ({ userRole = 'Manager' }) => {
   const [activities, setActivities] = useState([]);
@@ -40,7 +42,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
       setDepartments(depts);
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 
@@ -304,7 +306,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
       'Member': 'bg-gray-100 text-gray-700'
     };
     const badgeClass = colors[role] || 'bg-gray-100 text-gray-700';
-    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{role || 'Member'}</span>;
+    return <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${badgeClass}`}>{roleLabel(role || 'Member')}</span>;
   };
 
   const getTypeLabel = (type) => {

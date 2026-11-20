@@ -3,37 +3,7 @@ const { formatResponse } = require('../utils/helpers');
 const { uploadEmployeeDocumentToDrive } = require('../services/googleDriveService');
 const { canTerminateUser } = require('../utils/terminationPermissions');
 const crypto = require('crypto');
-
-const DEPARTMENTS = [
-  'Platform and DevOps',
-  'Core Systems',
-  'Hardware & Integration',
-  'Robotics & Simulation',
-  'Founding Team',
-  'AI/LLM & Perception',
-  'Management',
-  'CEO'
-];
-
-const DEPARTMENT_RENAMES = {
-  Operations: 'Platform and DevOps',
-  Engineering: 'Core Systems',
-  Design: 'Hardware & Integration',
-  Sales: 'Robotics & Simulation',
-  HR: 'Robotics & Simulation',
-  Finance: 'Robotics & Simulation',
-  Executive: 'Founding Team',
-  Marketing: 'AI/LLM & Perception'
-};
-
-const normalizeDepartment = (department) => DEPARTMENT_RENAMES[department] || department;
-
-const normalizeDepartments = (departments) => {
-  const normalized = departments.map(normalizeDepartment).filter(Boolean);
-  return DEPARTMENTS
-    .concat(normalized.filter((department) => !DEPARTMENTS.includes(department)))
-    .filter((department, index, list) => list.indexOf(department) === index);
-};
+const { DEPARTMENTS, normalizeDepartment, normalizeDepartments } = require('../config/departments');
 
 const getFullName = (user) =>
   user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
@@ -663,5 +633,38 @@ exports.uploadEmployeeDocument = async (req, res) => {
   } catch (error) {
     console.error('Employee document upload error:', error);
     res.status(500).json(formatResponse(false, error.message || 'Failed to upload employee document'));
+  }
+};
+
+// @desc    Bulk import employees from spreadsheet rows (parsed client-side)
+// @route   POST /api/employees/import
+// @access  Private (CEO, COO, Manager, HR)
+// Body: { rows: [{ "Header": value, ... }], dryRun: true|false, updateExisting: true|false }
+exports.importEmployees = async (req, res) => {
+  try {
+    const { rows, dryRun = true, updateExisting = false } = req.body || {};
+    if (!Array.isArray(rows) || rows.length === 0) {
+      return res.status(400).json(formatResponse(false, 'No rows to import'));
+    }
+    if (rows.length > 2000) {
+      return res.status(400).json(formatResponse(false, 'Import is limited to 2000 rows at a time'));
+    }
+
+    const { importEmployees } = require('../services/employeeImportService');
+    const result = await importEmployees(rows, {
+      dryRun: dryRun !== false,
+      updateExisting: Boolean(updateExisting),
+      importer: req.user
+    });
+
+    const { summary } = result;
+    const message = result.dryRun
+      ? `Preview: ${summary.toCreate} to create, ${summary.toUpdate} to update, ${summary.skipped} skipped, ${summary.errors} with errors`
+      : `Imported: ${summary.toCreate} created, ${summary.toUpdate} updated, ${summary.skipped} skipped, ${summary.errors} with errors`;
+
+    res.status(200).json(formatResponse(true, message, result));
+  } catch (error) {
+    console.error('Employee import error:', error);
+    res.status(500).json(formatResponse(false, error.message));
   }
 };

@@ -15,6 +15,7 @@ import {
   normalizeTask,
   normalizeTaskList,
 } from '../../../utils/taskMapper';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const TaskManagement = ({ userRole = 'Manager' }) => {
   const [tasks, setTasks] = useState([]);
@@ -125,7 +126,7 @@ const TaskManagement = ({ userRole = 'Manager' }) => {
       setDepartments(depts);
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 

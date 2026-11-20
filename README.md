@@ -2,21 +2,11 @@
 
 Internal operations and employee management portal for tracking daily tasks, attendance, leave requests, and team performance.
 
-##  Demo Accounts
+## Logging In
 
-The database comes pre-seeded with these test users:
+Accounts are created from the team sheet (see **Importing Real Employees from Excel** below). Each person's Employee ID and temporary password are in the `employee-credentials-*.csv` file the import creates. Employee IDs look like `CEO001`, `DIR001`, `LD001`, `PM001`, `INT001`.
 
-| Employee ID | Password | Role | Name |
-| :--- | :--- | :--- | :--- |
-| `CEO001` | `admin123` | CEO | John Doe |
-| `COO001` | `coo123` | COO | Aarav Mehta |
-| `MGR001` | `manager123` | Manager | Jane Smith |
-| `LD001` | `lead123` | Team Lead | Mike Johnson |
-| `EMP001` | `member123` | Member / Employee | Ravi Das |
-| `EMP002` | `member123` | Member / Employee | Priya Sharma |
-| `HR001` | `hr123` | HR | Neha Gupta |
-
-Log in using your Employee ID and password at the login screen.
+The old demo accounts (CEO001 / admin123, etc.) only exist if the database is started with `SEED_DEMO_DATA=true` or `npm run seed` is run.
 
 ## Features
 
@@ -130,6 +120,44 @@ Set `APP_PORT` in `.env` to change the host port. To stop the containers while p
 When the React frontend is deployed separately (for example, on Vercel), set the frontend build environment variable `REACT_APP_API_URL` to the backend's public API base URL, including `/api` (for example, `https://your-api.example.com/api`). Set it in the frontend hosting project's production environment and redeploy; React embeds this value at build time. The backend must be reachable over HTTPS. You can check it at `<backend-origin>/api/health` before testing login.
 
 For a backend deployed on Vercel, set the Vercel project root directory to `backend` and configure `DATABASE_URL` to a reachable managed PostgreSQL database. Vercel functions do not provide persistent storage for the local PGlite database. Configure `JWT_SECRET` there as well.
+
+## Importing Real Employees from Excel
+
+The seeded users are demo data. To load your actual staff list:
+
+**From the web app (CEO / COO / Manager):** Employee Database → **Import from Excel** → choose the `.xlsx` or `.csv`. You get a preview showing who will be created, who already exists, and which rows have problems (missing/invalid email, duplicates). Click **Import**, then **Download login credentials** — each new employee gets a random temporary password that is shown only once.
+
+**From the command line (bulk / first-time load, works against local PGlite or Render via `DATABASE_URL`):**
+
+```bash
+npm install --prefix backend
+npm run import:employees -- ./employees.xlsx                  # preview only, nothing written
+npm run import:employees -- ./employees.xlsx --commit         # write to the database
+npm run import:employees -- ./employees.xlsx --commit --update  # also update existing employees
+```
+
+The CLI writes `employee-credentials-<timestamp>.csv` next to the sheet (git-ignored). Share it privately, then delete it.
+
+**Sheet format.** Only a name and an email column are required. Common headings are recognised automatically (`Employee Name`, `Official Email ID`, `Mobile No`, `Dept`, `Designation`, `Reporting Manager`, `Date of Joining`/`DOJ`, `DOB`, `Emp Code`, `Status`, …), title rows above the header are skipped, and unknown columns are kept under `additionalInfo`. Dates may be Excel dates, `DD/MM/YYYY` or `YYYY-MM-DD`; 10-digit phone numbers get a `+91` prefix.
+
+- **Role** column sets access. Spaceborn titles map to the app's permission levels: `CEO` → CEO, `Director` → COO (full access), `Team Lead` / `Co-Lead` → Team Lead, `Project Manager` → Manager (can add/remove people, approve leave), `HR` → HR, `Intern` → Member. The app shows the Spaceborn titles everywhere (see `frontend/src/utils/roleLabels.js`). Without a Role column everyone is imported as Intern.
+- **Employee ID** is optional; missing IDs are generated (`INT001`, `LD002`, `DIR001`, `PM001`, …) after the highest existing number.
+- Employees are matched by Employee ID, then email. Re-running the same sheet is safe: existing people are skipped unless `--update` / "Update employees that already exist" is chosen. Passwords are never changed by an update.
+- **Reporting Manager** (name, employee ID or email) is linked to that person's record when they exist in the system.
+- COO cannot import a CEO; Managers and HR cannot import CEO/COO.
+
+### Starting fresh (removing the example data)
+
+The example users (John Doe, Jane Smith, …) are no longer created automatically. Set `SEED_DEMO_DATA=true` if you want them for a demo, or run `npm run seed`.
+
+To clear an existing database (local, or Render when `DATABASE_URL` is set) and load the real team:
+
+```bash
+npm run db:reset -- --yes                                   # deletes ALL data; cannot be undone
+npm run import:employees -- ./Team_Data_CLEAN.xlsx --commit
+```
+
+Departments are defined once in `backend/src/config/departments.js` (and mirrored in `frontend/src/utils/departments.js`), including the spelling variants that get cleaned up on import.
 
 ## Project Structure
 

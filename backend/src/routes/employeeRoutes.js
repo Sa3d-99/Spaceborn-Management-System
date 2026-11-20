@@ -20,6 +20,7 @@ const {
   updateLeaveBalance,
   searchEmployees,
   uploadEmployeeDocument,
+  importEmployees,
 } = require('../controllers/userController');
 
 const upload = multer({
@@ -39,6 +40,8 @@ const upload = multer({
 
 router.use(protect);
 
+// Bulk import from Excel/CSV rows. Send { rows, dryRun, updateExisting }.
+router.post('/import', authorize('CEO', 'COO', 'Manager', 'HR'), importEmployees);
 router.get('/departments', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeDepartments);
 router.get('/stats', authorize('CEO', 'COO', 'Manager'), getEmployeeStats);
 router.get('/search', authorize('CEO', 'COO', 'Manager', 'Team Lead'), searchEmployees);

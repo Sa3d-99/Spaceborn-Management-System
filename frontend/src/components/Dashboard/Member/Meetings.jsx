@@ -1,6 +1,7 @@
 // src/components/Dashboard/CEO/Meetings.js (and for other roles)
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Meetings = ({ userRole = 'CEO' }) => {
   const [scheduledMeetings, setScheduledMeetings] = useState([]);
@@ -20,7 +21,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
   });
 const safeMeetings = scheduledMeetings || [];
   // Available departments for filtering
-  const departments = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All'];
+  const departments = [...DEPARTMENTS, 'All'];
 
   // Fetch meetings from API
   useEffect(() => {

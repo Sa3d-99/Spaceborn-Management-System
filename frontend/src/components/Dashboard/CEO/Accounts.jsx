@@ -5,6 +5,8 @@ import authService from '../../../services/authService';
 import employeeService from '../../../services/employeeService';
 import { randomPassword, updateEmployeeById, resetEmployeePassword, deactivateEmployee, activateEmployee } from './employeeClient';
 import * as XLSX from 'xlsx';
+import { roleLabel } from '../../../utils/roleLabels';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Accounts = ({ userRole = 'CEO' }) => {
   // View/Edit modal state
@@ -264,7 +266,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
       setDepartments(depts.filter(d => d !== 'Founding team'));
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'Founding Team', 'AI/LLM & Perception', 'Management', 'CEO']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 
@@ -573,7 +575,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, role: e.target.value }))}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 >
-                  {roles.map(role => (<option key={role} value={role}>{role}</option>))}
+                  {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
                 </select>
               </div>
 
@@ -783,7 +785,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
               </div>
               <div className="flex justify-between items-center">
                 <span className="text-sm text-gray-600">Role:</span>
-                <span className="text-sm text-gray-900">{generatedCredentials.role}</span>
+                <span className="text-sm text-gray-900">{roleLabel(generatedCredentials.role)}</span>
               </div>
             </div>
             
@@ -826,7 +828,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">ROLE *</label>
               <select name="role" value={formData.role} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required>
-                {roles.map(role => (<option key={role} value={role}>{role}</option>))}
+                {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
               </select>
             </div>
             <div>
@@ -869,7 +871,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
             </div>
             <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
               <option value="all">All Roles</option>
-              {roles.map(role => (<option key={role} value={role}>{role}</option>))}
+              {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
             </select>
             <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
               <option value="all">All Departments</option>
@@ -909,7 +911,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                         </div>
                       </td>
                       <td className="px-6 py-4 text-gray-600">{account.email}</td>
-                      <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">{account.role}</span></td>
+                      <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">{roleLabel(account.role)}</span></td>
                       <td className="px-6 py-4 text-gray-600">{account.department}</td>
                       <td className="px-6 py-4"><span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">{account.status || 'Active'}</span></td>
                       <td className="px-6 py-4 text-gray-600">{account.joinDate ? new Date(account.joinDate).toLocaleDateString() : '-'}</td>
@@ -939,7 +941,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
       {Object.keys(stats.byRole).map((role) => (
         <div key={role} className="text-center p-2 bg-gray-50 rounded-lg">
           <p className="text-lg font-bold text-gray-900">{stats.byRole[role]}</p>
-          <p className="text-xs text-gray-500">{role}s</p>
+          <p className="text-xs text-gray-500">{roleLabel(role)}s</p>
         </div>
       ))}
     </div>

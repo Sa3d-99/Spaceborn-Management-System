@@ -1,6 +1,7 @@
 // src/components/Dashboard/CEO/Meetings.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Meetings = ({ userRole = 'CEO' }) => {
   const [scheduledMeetings, setScheduledMeetings] = useState([]);
@@ -22,7 +23,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
   });
 
   // Available departments
-  const departments = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All'];
+  const departments = [...DEPARTMENTS, 'All'];
 // Safe array helper
 const safeMeetings = scheduledMeetings || [];
   // Fetch meetings from API

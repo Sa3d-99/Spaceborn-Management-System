@@ -1,6 +1,7 @@
 // src/components/Login/ProtectedRoute.jsx
 import React, { useEffect, useState } from 'react';
 import authService from '../../services/authService';
+import { roleLabel } from '../../utils/roleLabels';
 
 const ProtectedRoute = ({ 
   children, 
@@ -211,7 +212,7 @@ const ProtectedRoute = ({
               <div className="flex flex-wrap gap-2 justify-center">
                 {requiredRoles.map(role => (
                   <span key={role} className={`px-2 py-1 rounded-md text-xs font-medium ${getRoleBadgeColor(role)}`}>
-                    {role}
+                    {roleLabel(role)}
                   </span>
                 ))}
               </div>

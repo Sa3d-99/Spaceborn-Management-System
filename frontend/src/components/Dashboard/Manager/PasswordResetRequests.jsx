@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 import { Bell, CheckCircle, XCircle, Clock, Eye, RefreshCw } from 'lucide-react';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const PasswordResetRequests = ({ userRole }) => {
   const [requests, setRequests] = useState([]);
@@ -206,7 +207,7 @@ const PasswordResetRequests = ({ userRole }) => {
                       </div>
                       <div>
                         <span className="text-gray-500">Role:</span>
-                        <span className="ml-2 text-gray-900">{request.role}</span>
+                        <span className="ml-2 text-gray-900">{roleLabel(request.role)}</span>
                       </div>
                       <div>
                         <span className="text-gray-500">Requested:</span>

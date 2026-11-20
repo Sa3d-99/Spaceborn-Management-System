@@ -1,4 +1,5 @@
 import React from 'react';
+import { roleLabel } from '../../utils/roleLabels';
 
 const MemberSidebar = ({ activeMenu, setActiveMenu, user }) => {
   const menuItems = [
@@ -27,7 +28,7 @@ const MemberSidebar = ({ activeMenu, setActiveMenu, user }) => {
       <div className="px-4 py-3 border-b border-gray-100 bg-cyan-50">
         <p className="text-xs text-gray-500">Logged in as</p>
         <p className="text-sm font-semibold text-gray-900">{user.name}</p>
-        <p className="text-xs text-gray-500">{user.id} · {user.role}</p>
+        <p className="text-xs text-gray-500">{user.id} · {roleLabel(user.role)}</p>
       </div>
 
       <nav className="flex-1 p-4 overflow-y-auto">
@@ -52,7 +53,7 @@ const MemberSidebar = ({ activeMenu, setActiveMenu, user }) => {
           </div>
           <div>
             <p className="text-sm font-medium text-gray-900">{user.name}</p>
-            <p className="text-xs text-gray-500">{user.role}</p>
+            <p className="text-xs text-gray-500">{roleLabel(user.role)}</p>
           </div>
         </div>
       </div>

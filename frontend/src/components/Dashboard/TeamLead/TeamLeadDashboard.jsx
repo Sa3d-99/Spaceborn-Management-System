@@ -1,6 +1,7 @@
 // src/components/Dashboard/TeamLead/TeamLeadDashboard.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const TeamLeadDashboard = () => {
   const [teamLeadData, setTeamLeadData] = useState({
@@ -236,7 +237,7 @@ const TeamLeadDashboard = () => {
             <div className="flex-1">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{teamLeadData.name}</h1>
-                <p className="text-sm text-purple-600 font-medium mt-1">{teamLeadData.role}</p>
+                <p className="text-sm text-purple-600 font-medium mt-1">{roleLabel(teamLeadData.role)}</p>
                 <p className="text-sm text-gray-500">{teamLeadData.title}</p>
               </div>
               <p className="text-gray-600 mt-3">{teamLeadData.description}</p>
@@ -342,7 +343,7 @@ const TeamLeadDashboard = () => {
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">{member.name}</p>
-                      <p className="text-xs text-gray-500">{member.role}</p>
+                      <p className="text-xs text-gray-500">{roleLabel(member.role)}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
@@ -524,7 +525,7 @@ const TeamLeadDashboard = () => {
                   </div>
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">{selectedMember.name}</h3>
-                    <p className="text-gray-500">{selectedMember.role}</p>
+                    <p className="text-gray-500">{roleLabel(selectedMember.role)}</p>
                     <p className="text-sm text-gray-400">{selectedMember.email}</p>
                   </div>
                 </div>

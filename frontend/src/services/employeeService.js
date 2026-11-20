@@ -256,6 +256,27 @@ class EmployeeService {
     return this.createEmployee(employeeData);
   }
 
+  // Bulk import employees from spreadsheet rows.
+  // Calls the API directly (no mock fallback) so failures are never hidden.
+  async importEmployees(rows, { dryRun = true, updateExisting = false } = {}) {
+    const token = authService.getToken();
+    const response = await fetch(`${this.API_BASE_URL}/employees/import`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+        ...(token && { Authorization: `Bearer ${token}` })
+      },
+      body: JSON.stringify({ rows, dryRun, updateExisting })
+    });
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false) {
+      throw new Error(data.message || `Import failed (status ${response.status})`);
+    }
+    if (!dryRun) this.clearCache();
+    return data.data;
+  }
+
   async updateEmployee(id, employeeData) {
     if (!id) throw new Error('Employee ID is required');
     

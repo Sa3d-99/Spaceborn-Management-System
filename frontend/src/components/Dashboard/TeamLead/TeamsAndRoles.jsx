@@ -1,6 +1,8 @@
 // src/components/Dashboard/CEO/TeamsAndRoles.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { roleLabel } from '../../../utils/roleLabels';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const TeamsAndRoles = ({ userRole = 'CEO' }) => {
   const [teamMembers, setTeamMembers] = useState([]);
@@ -32,7 +34,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
   // Available options
   const roles = ['Member', 'Lead', 'Manager', 'CEO'];
   const statuses = ['Active', 'Inactive', 'On Leave'];
-  const departmentsList = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception'];
+  const departmentsList = [...DEPARTMENTS];
 
   // Fetch team members from API
   useEffect(() => {
@@ -110,7 +112,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
     } catch (error) {
       console.error('Error fetching departments:', error);
       if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+        setDepartments([...DEPARTMENTS]);
       }
     }
   };
@@ -472,7 +474,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {roles.map(role => (
-                    <option key={role} value={role}>{role}</option>
+                    <option key={role} value={role}>{roleLabel(role)}</option>
                   ))}
                 </select>
               </div>
@@ -554,7 +556,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
           >
             <option value="All">All Roles</option>
             {roles.map(role => (
-              <option key={role} value={role}>{role}</option>
+              <option key={role} value={role}>{roleLabel(role)}</option>
             ))}
           </select>
           <select 
@@ -632,7 +634,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <td className="px-6 py-4 text-sm text-gray-600">{member.designation}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role)}`}>
-                        {member.role}
+                        {roleLabel(member.role)}
                       </span>
                     </td>
                     <td className="px-6 py-4">
@@ -696,7 +698,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                         <td className="px-6 py-4 text-sm text-gray-600">{member.designation}</td>
                         <td className="px-6 py-4">
                           <span className={`px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(member.role)}`}>
-                            {member.role}
+                            {roleLabel(member.role)}
                           </span>
                         </td>
                         <td className="px-6 py-4">
@@ -827,7 +829,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <div>
                       <label className="text-xs text-gray-500 uppercase font-medium">Role</label>
                       <p className={`mt-1 inline-block px-2 py-1 rounded-full text-xs font-medium ${getRoleBadgeColor(selectedMember.role)}`}>
-                        {selectedMember.role}
+                        {roleLabel(selectedMember.role)}
                       </p>
                     </div>
                     <div>
@@ -916,7 +918,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       className="w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       {roles.map(role => (
-                        <option key={role} value={role}>{role}</option>
+                        <option key={role} value={role}>{roleLabel(role)}</option>
                       ))}
                     </select>
                   </div>

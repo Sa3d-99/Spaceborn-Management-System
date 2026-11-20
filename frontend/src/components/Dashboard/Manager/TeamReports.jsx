@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import reportService from '../../../services/reportService';
 import roadmapService from '../../../services/roadmapService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const ManagerTeamReports = ({ userRole = 'Manager', department, user }) => {
   const isExecutiveViewer = userRole === 'COO';
@@ -713,7 +714,7 @@ Report Generated: ${new Date().toLocaleString()}
                         </div>
                         <div>
                           <p className="text-sm font-medium text-gray-900">{roadmap.sharedBy?.name || 'Team Lead'}</p>
-                          <p className="text-xs text-gray-500">{roadmap.sharedBy?.role || 'Team Lead'}</p>
+                          <p className="text-xs text-gray-500">{roleLabel(roadmap.sharedBy?.role || 'Team Lead')}</p>
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">

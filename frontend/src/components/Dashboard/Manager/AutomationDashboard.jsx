@@ -12,6 +12,7 @@ import warningSimulatorService from '../../../services/warningSimulatorService';
 import emailSimulatorService from '../../../services/emailSimulatorService';
 import EmailPreviewModal from '../../Common/EmailPreviewModal';
 import * as XLSX from 'xlsx';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
   const [activeTab, setActiveTab] = useState('attendance');
@@ -978,7 +979,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                                 {warning.department}
                               </span>
                             </div>
-                            <p className="text-sm text-gray-500 mt-1">{warning.role}</p>
+                            <p className="text-sm text-gray-500 mt-1">{roleLabel(warning.role)}</p>
                             <p className="text-sm text-gray-600 mt-2">{warning.reason}</p>
                             <div className="flex items-center space-x-4 mt-2">
                               <p className="text-xs text-gray-400">

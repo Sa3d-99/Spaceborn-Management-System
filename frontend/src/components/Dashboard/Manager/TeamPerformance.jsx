@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 import taskService from '../../../services/taskService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const TeamPerformance = ({ userRole = 'Team Lead' }) => {
   const [teamMembers, setTeamMembers] = useState([]);
@@ -379,7 +380,7 @@ const TeamPerformance = ({ userRole = 'Team Lead' }) => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{member.role}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(member.role)}</td>
                     <td className="px-6 py-4">
                       <div>
                         <span className="text-sm font-medium text-gray-900">{member.completed || 0}</span>

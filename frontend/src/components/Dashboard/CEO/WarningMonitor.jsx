@@ -4,6 +4,7 @@ import warningSimulatorService from '../../../services/warningSimulatorService';
 import emailSimulatorService from '../../../services/emailSimulatorService';
 import EmailPreviewModal from '../../Common/EmailPreviewModal';
 import { DEPARTMENTS, normalizeDepartment } from '../../../utils/departments';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const WarningMonitor = ({ userRole }) => {
   const [warnings, setWarnings] = useState([]);
@@ -284,7 +285,7 @@ const WarningMonitor = ({ userRole }) => {
                             {warning.department}
                           </span>
                         </div>
-                        <p className="text-sm text-gray-500 mt-1">{warning.role}</p>
+                        <p className="text-sm text-gray-500 mt-1">{roleLabel(warning.role)}</p>
                         <p className="text-sm text-gray-600 mt-2">{warning.reason}</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <p className="text-xs text-gray-400">
@@ -347,7 +348,7 @@ const WarningMonitor = ({ userRole }) => {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wider">Department / Role</label>
-                  <p className="font-medium">{selectedWarning.department} • {selectedWarning.role}</p>
+                  <p className="font-medium">{selectedWarning.department} • {roleLabel(selectedWarning.role)}</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wider">Warning Type</label>

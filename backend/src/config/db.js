@@ -90,19 +90,24 @@ async function connectDB() {
   isConnected = true;
   console.log('✅ PostgreSQL Schema Initialized (18 Tables Ready)');
 
-  // Auto-seed if users table is empty
+  // Demo data (John Doe, Jane Smith, ...) is only created when SEED_DEMO_DATA=true.
+  // Real staff are loaded with: npm run import:employees -- <sheet.xlsx> --commit
   try {
     const userRes = await query('SELECT count(*) as count FROM users');
     const count = parseInt(userRes.rows[0]?.count || 0, 10);
     if (count === 0) {
-      console.log('🌱 No users found. Auto-seeding initial users...');
-      const seed = require('../../seed');
-      if (typeof seed.runSeed === 'function') {
-        await seed.runSeed();
+      if (process.env.SEED_DEMO_DATA === 'true') {
+        console.log('🌱 No users found. Seeding demo users (SEED_DEMO_DATA=true)...');
+        const seed = require('../../seed');
+        if (typeof seed.runSeed === 'function') {
+          await seed.runSeed();
+        }
+      } else {
+        console.log('ℹ️  No users yet. Load your team with: npm run import:employees -- <sheet.xlsx> --commit');
       }
     }
   } catch (err) {
-    console.warn('⚠️ Auto-seed check warning:', err.message);
+    console.warn('⚠️ Startup user check warning:', err.message);
   }
 
   return db;
@@ -113,3 +118,4 @@ module.exports.getDb = getDb;
 module.exports.query = query;
 module.exports.exec = exec;
 module.exports.connectDB = connectDB;
+module.exports.TABLES = TABLES;

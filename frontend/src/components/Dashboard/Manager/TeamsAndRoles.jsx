@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import employeeService from '../../../services/employeeService';
 import authService from '../../../services/authService';
-import { normalizeDepartment } from '../../../utils/departments';
+import { normalizeDepartment, DEPARTMENTS } from '../../../utils/departments';
 
 const TeamsAndRoles = ({ userRole = 'Manager' }) => {
   const [activeTab, setActiveTab] = useState('teams');
@@ -16,7 +16,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
   const [teams, setTeams] = useState([]);
   const [members, setMembers] = useState([]);
   const [roles, setRoles] = useState([]);
-  const [departments, setDepartments] = useState(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All']);
+  const [departments, setDepartments] = useState([...DEPARTMENTS, 'All']);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [showMemberModal, setShowMemberModal] = useState(false);

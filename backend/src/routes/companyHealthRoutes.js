@@ -5,17 +5,7 @@ const User = require('../models/User');
 const Task = require('../models/Task');
 const Leave = require('../models/Leave');
 const { protect, authorize } = require('../middleware/authMiddleware');
-
-const DEPARTMENTS = [
-  'Platform and DevOps',
-  'Core Systems',
-  'Hardware & Integration',
-  'Robotics & Simulation',
-  'Founding Team',
-  'AI/LLM & Perception',
-  'Management',
-  'CEO'
-];
+const { DEPARTMENTS } = require('../config/departments');
 
 router.get('/', protect, authorize('CEO'), async (req, res) => {
   try {

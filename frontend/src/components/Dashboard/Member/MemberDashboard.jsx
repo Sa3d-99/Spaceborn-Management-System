@@ -6,6 +6,7 @@ import {
   getTaskId,
   normalizeTaskList,
 } from '../../../utils/taskMapper';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const MemberDashboard = () => {
   const [memberData, setMemberData] = useState({
@@ -246,7 +247,7 @@ const MemberDashboard = () => {
             <div className="flex items-center justify-between">
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">{memberData.name}</h1>
-                <p className="text-sm text-cyan-600 font-medium mt-1">{memberData.role}</p>
+                <p className="text-sm text-cyan-600 font-medium mt-1">{roleLabel(memberData.role)}</p>
                 <p className="text-sm text-gray-500">{memberData.title}</p>
               </div>
             </div>

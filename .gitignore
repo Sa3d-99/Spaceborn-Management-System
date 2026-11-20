@@ -128,3 +128,6 @@ frontend/build/
 
 # Embedded PostgreSQL data
 backend/data/
+
+# Bulk import output (contains temporary passwords)
+employee-credentials-*.csv

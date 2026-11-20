@@ -4,6 +4,7 @@ import authService from '../../../services/authService';
 import taskService from '../../../services/taskService';
 import employeeService from '../../../services/employeeService';
 import LoginManagement from './LoginManagement';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const ManagerDashboard = () => {
   const [activeTab, setActiveTab] = useState('overview');
@@ -169,28 +170,19 @@ const ManagerDashboard = () => {
     }
   };
 
+  // Real counts from the server (completed tasks + submitted reports), not made-up numbers.
   const fetchTopPerformers = async () => {
     try {
-      const employees = await employeeService.getAllEmployees();
-      const teamMembers = employees.filter(emp => emp.role !== 'CEO');
-      
-      const performers = teamMembers.map(member => ({
-        name: member.name,
-        role: member.role,
-        department: member.department,
-        tasks: Math.floor(Math.random() * 50) + 10,
-        initials: member.name?.split(' ').map(n => n[0]).join('').toUpperCase() || 'U',
-        avatar: member.name?.charAt(0) || 'U'
-      })).sort((a, b) => b.tasks - a.tasks).slice(0, 5);
-      
+      const token = authService.getToken();
+      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const response = await fetch(`${API_BASE_URL}/dashboard/manager`, { headers: { 'Authorization': `Bearer ${token}` } });
+      if (!response.ok) throw new Error(`Status ${response.status}`);
+      const data = await response.json();
+      const performers = (data.topPerformers || data.data?.topPerformers || []).filter(p => p.tasks > 0);
       setTopPerformers(performers);
     } catch (error) {
       console.error('Error fetching top performers:', error);
-      setTopPerformers([
-        { name: 'Priya Sharma', role: 'Senior Engineer', department: 'Core Systems', tasks: 31, initials: 'PS', avatar: 'P' },
-        { name: 'Ravi Das', role: 'Frontend Developer', department: 'Core Systems', tasks: 28, initials: 'RD', avatar: 'R' },
-        { name: 'Nisha Kumar', role: 'Backend Developer', department: 'Core Systems', tasks: 22, initials: 'NK', avatar: 'N' }
-      ]);
+      setTopPerformers([]);
     }
   };
 
@@ -308,7 +300,7 @@ const ManagerDashboard = () => {
       <div className="bg-white rounded-xl border p-6 mb-6">
         <h2 className="text-xl font-semibold text-gray-900">{managerName}</h2>
         <div className="flex items-center gap-2 mt-1 flex-wrap">
-          <span className="text-sm font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded">{currentUser?.role || 'Manager'}</span>
+          <span className="text-sm font-medium text-blue-700 bg-blue-100 px-2 py-0.5 rounded">{roleLabel(currentUser?.role || 'Manager')}</span>
           <span className="text-sm text-gray-500">All departments</span>
           <span className="text-sm text-gray-500">•</span>
           <span className="text-sm text-gray-500">{stats.teamMembers} Team Members</span>
@@ -389,6 +381,9 @@ const ManagerDashboard = () => {
             <h3 className="font-semibold text-gray-900">🏆 Top Performers — This Month</h3>
           </div>
           <div className="p-5 space-y-4">
+            {topPerformers.length === 0 && (
+              <p className="text-sm text-gray-500">No completed tasks yet this month.</p>
+            )}
             {topPerformers.map((performer, idx) => (
               <div key={idx} className="flex justify-between items-center hover:bg-gray-50 p-2 rounded-lg transition">
                 <div className="flex items-center gap-3">
@@ -407,7 +402,7 @@ const ManagerDashboard = () => {
                   </div>
                   <div>
                     <div className="font-medium text-gray-900">{performer.name}</div>
-                    <div className="text-xs text-gray-500">{performer.role} · {performer.department}</div>
+                    <div className="text-xs text-gray-500">{roleLabel(performer.role)} · {performer.department}</div>
                   </div>
                 </div>
                 <div className="text-right">

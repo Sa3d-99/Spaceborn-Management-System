@@ -1,6 +1,7 @@
 // src/components/Dashboard/Manager/Meetings.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Meetings = ({ userRole = 'Manager' }) => {
   const [formData, setFormData] = useState({
@@ -20,7 +21,7 @@ const Meetings = ({ userRole = 'Manager' }) => {
   const [departmentFilter, setDepartmentFilter] = useState('all');
   const [showScheduleForm, setShowScheduleForm] = useState(false);
 
-  const departments = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All'];
+  const departments = [...DEPARTMENTS, 'All'];
 
   useEffect(() => {
     fetchMeetings();

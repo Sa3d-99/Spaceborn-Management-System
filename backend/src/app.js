@@ -11,7 +11,10 @@ app.use(cors({
   credentials: true
 }));
 
-app.use(express.json());
+// Bulk employee import sends the whole spreadsheet as JSON; give only that route a larger limit.
+const defaultJson = express.json();
+const importJson = express.json({ limit: '5mb' });
+app.use((req, res, next) => (req.path === '/api/employees/import' ? importJson : defaultJson)(req, res, next));
 app.use(express.urlencoded({ extended: true }));
 
 // Initialize once per warm serverless instance before handling API requests.

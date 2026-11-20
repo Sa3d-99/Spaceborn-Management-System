@@ -1,6 +1,7 @@
 // src/components/Dashboard/Member/MemberProfileView.jsx
 import React, { useState } from 'react';
 import authService from '../../../services/authService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const MemberProfileView = ({ userData, onUpdate }) => {
   const [formData, setFormData] = useState(userData);
@@ -176,7 +177,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
             </div>
             <div>
               <h3 className="text-lg font-semibold text-gray-900">{formData?.name}</h3>
-              <p className="text-gray-500">{formData?.role} · {formData?.department}</p>
+              <p className="text-gray-500">{roleLabel(formData?.role)} · {formData?.department}</p>
               <p className="text-sm text-gray-400">Employee ID: {formData?.employeeId}</p>
               {!isEditing && (
                 <button
@@ -238,7 +239,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
 
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-              <p className="text-gray-900">{formData?.role}</p>
+              <p className="text-gray-900">{roleLabel(formData?.role)}</p>
             </div>
 
             <div>

@@ -6,7 +6,9 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "seed": "node seed.js"
+    "seed": "node seed.js",
+    "import:employees": "node scripts/importEmployees.js",
+    "db:reset": "node scripts/resetDatabase.js"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.12",
@@ -14,6 +16,7 @@
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.6",
     "dotenv": "^16.6.1",
+    "exceljs": "^4.4.0",
     "express": "^4.22.2",
     "express-rate-limit": "^8.5.2",
     "express-validator": "^7.3.2",

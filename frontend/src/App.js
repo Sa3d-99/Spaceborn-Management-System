@@ -78,6 +78,7 @@ import MemberResources from './components/Dashboard/Member/Resources';
 import MemberMeetings from './components/Dashboard/Member/Meetings';
 import MemberNotifications from './components/Dashboard/Member/Notifications.jsx';
 import MemberProfileView from './components/Dashboard/Member/MemberProfileView';
+import { roleLabel } from './utils/roleLabels';
 
 function App() {
   const [user, setUser] = useState(null);
@@ -312,11 +313,11 @@ function App() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex flex-wrap gap-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'CEO' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>CEO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>COO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Manager</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>CO Head</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Lead</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Member</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Director</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Team Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>Co-Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Project Manager</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Intern</span>
                 </div>
               </div>
               <nav className="flex-1 p-4">
@@ -459,6 +460,7 @@ function App() {
                     onUpdateEmployee={handleUpdateEmployee}
                     onAddEmployee={handleAddEmployee}
                     onDeleteEmployee={handleDeleteEmployee}
+                    onImportComplete={fetchEmployees}
                   />
                 )}
                 {activeMenu === 'TeamReports' && <CEOTeamReports userRole={user.role} department={getUserDepartment()} user={user} />}
@@ -517,11 +519,11 @@ function App() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex flex-wrap gap-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'CEO' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>CEO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>COO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Manager</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>CO Head</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Lead</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Member</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Director</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Team Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>Co-Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Project Manager</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Intern</span>
                 </div>
               </div>
               <nav className="flex-1 p-4 overflow-y-auto">
@@ -667,6 +669,7 @@ function App() {
                     onUpdateEmployee={handleUpdateEmployee}
                     onAddEmployee={handleAddEmployee}
                     onDeleteEmployee={handleDeleteEmployee}
+                    onImportComplete={fetchEmployees}
                   />
                 )}
                 {managerActiveMenu === 'TeamReports' && <TeamReportsComponent userRole={managerDisplayRole} department={null} user={user} />}
@@ -707,11 +710,11 @@ function App() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex flex-wrap gap-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'CEO' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>CEO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>COO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Manager</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>CO Head</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Lead</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Member</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Director</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Team Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>Co-Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Project Manager</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Intern</span>
                 </div>
               </div>
               <nav className="flex-1 p-4 overflow-y-auto">
@@ -770,7 +773,7 @@ function App() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.role} · {getUserDepartment()}</p>
+                    <p className="text-xs text-gray-500">{roleLabel(user.role)} · {getUserDepartment()}</p>
                   </div>
                   <LogoutButton onLogout={handleLogout} />
                 </div>
@@ -817,11 +820,11 @@ function App() {
               <div className="px-4 py-3 border-b border-gray-100">
                 <div className="flex flex-wrap gap-2">
                   <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'CEO' ? 'bg-purple-100 text-purple-700' : 'bg-gray-100 text-gray-600'}`}>CEO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>COO</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Manager</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>CO Head</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Lead</span>
-                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Member</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'COO' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Director</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Team Lead' ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>Team Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Co-Head' || user.role === 'CO Head' ? 'bg-teal-100 text-teal-700' : 'bg-gray-100 text-gray-600'}`}>Co-Lead</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Manager' ? 'bg-blue-100 text-blue-700' : 'bg-gray-100 text-gray-600'}`}>Project Manager</span>
+                  <span className={`px-2 py-1 text-xs font-medium rounded ${user.role === 'Member' ? 'bg-cyan-100 text-cyan-700' : 'bg-gray-100 text-gray-600'}`}>Intern</span>
                 </div>
               </div>
               <nav className="flex-1 p-4 overflow-y-auto">
@@ -890,7 +893,7 @@ function App() {
                   </div>
                   <div className="flex-1">
                     <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{user.role} · {user.department}</p>
+                    <p className="text-xs text-gray-500">{roleLabel(user.role)} · {user.department}</p>
                   </div>
                   <LogoutButton onLogout={handleLogout} />
                 </div>

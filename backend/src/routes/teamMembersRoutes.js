@@ -3,6 +3,7 @@ const router = express.Router();
 
 const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
+const { DEPARTMENTS, normalizeDepartment, normalizeDepartments } = require('../config/departments');
 
 const getUserName = (user) =>
   user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
@@ -15,37 +16,6 @@ const getInitials = (name) =>
     .map((x) => x[0])
     .join('')
     .toUpperCase();
-
-const DEPARTMENTS = [
-  'Platform and DevOps',
-  'Core Systems',
-  'Hardware & Integration',
-  'Robotics & Simulation',
-  'Founding Team',
-  'AI/LLM & Perception',
-  'Management',
-  'CEO'
-];
-
-const DEPARTMENT_RENAMES = {
-  Operations: 'Platform and DevOps',
-  Engineering: 'Core Systems',
-  Design: 'Hardware & Integration',
-  Sales: 'Robotics & Simulation',
-  HR: 'Robotics & Simulation',
-  Finance: 'Robotics & Simulation',
-  Executive: 'Founding Team',
-  Marketing: 'AI/LLM & Perception'
-};
-
-const normalizeDepartment = (department) => DEPARTMENT_RENAMES[department] || department;
-
-const normalizeDepartments = (departments) => {
-  const normalized = departments.map(normalizeDepartment).filter(Boolean);
-  return DEPARTMENTS
-    .concat(normalized.filter((department) => !DEPARTMENTS.includes(department)))
-    .filter((department, index, list) => list.indexOf(department) === index);
-};
 
 const toEmployeeDto = (u) => {
   const name = getUserName(u);

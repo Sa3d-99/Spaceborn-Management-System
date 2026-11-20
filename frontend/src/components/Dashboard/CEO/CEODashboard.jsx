@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import authService from '../../../services/authService';
 import GoogleDriveViewer from '../../Common/GoogleDriveViewer';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const CEODashboard = ({ user, onLogout }) => {
   const [showDriveViewer, setShowDriveViewer] = useState(false);
@@ -252,7 +253,7 @@ const CEODashboard = ({ user, onLogout }) => {
                   </div>
                   <div>
                     <div className="font-medium text-gray-900">{performer.name}</div>
-                    <div className="text-xs text-gray-500">{performer.role}</div>
+                    <div className="text-xs text-gray-500">{roleLabel(performer.role)}</div>
                   </div>
                 </div>
                 <div className="text-sm font-semibold text-gray-900">{performer.tasks} tasks</div>

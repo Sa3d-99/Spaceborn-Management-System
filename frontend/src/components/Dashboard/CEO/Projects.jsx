@@ -1,6 +1,7 @@
 // src/components/Dashboard/CEO/Projects.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Projects = ({ userRole = 'CEO' }) => {
   const [projects, setProjects] = useState([]);
@@ -95,7 +96,7 @@ const Projects = ({ userRole = 'CEO' }) => {
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 

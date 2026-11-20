@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 import employeeService from '../../../services/employeeService';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const TeamMembers = ({ userRole = 'Team Lead' }) => {
   const [teamMembers, setTeamMembers] = useState([]);
@@ -345,7 +346,7 @@ const TeamMembers = ({ userRole = 'Team Lead' }) => {
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{member.role}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(member.role)}</td>
                     <td className="px-6 py-4 text-sm text-gray-500">{member.email}</td>
                     <td className="px-6 py-4">{getStatusBadge(member.status)}</td>
                     <td className="px-6 py-4">
@@ -391,7 +392,7 @@ const TeamMembers = ({ userRole = 'Team Lead' }) => {
                 </div>
                 <div>
                   <h3 className="text-lg font-semibold text-gray-900">{selectedMember.name}</h3>
-                  <p className="text-gray-500">{selectedMember.role}</p>
+                  <p className="text-gray-500">{roleLabel(selectedMember.role)}</p>
                   <div className="mt-1">{getStatusBadge(selectedMember.status)}</div>
                 </div>
               </div>

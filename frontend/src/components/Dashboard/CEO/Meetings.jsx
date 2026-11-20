@@ -1,6 +1,7 @@
 // src/components/Dashboard/CEO/Meetings.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const Meetings = ({ userRole = 'CEO' }) => {
   const [formData, setFormData] = useState({
@@ -21,8 +22,8 @@ const Meetings = ({ userRole = 'CEO' }) => {
   const [showScheduleForm, setShowScheduleForm] = useState(false);
   const [departments, setDepartments] = useState([]);
 
-  const departmentsList = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All'];
-  const filterButtons = ['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception', 'All'];
+  const departmentsList = [...DEPARTMENTS, 'All'];
+  const filterButtons = [...DEPARTMENTS, 'All'];
 
   useEffect(() => {
     fetchMeetings();
@@ -96,7 +97,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 

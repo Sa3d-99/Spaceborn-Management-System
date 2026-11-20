@@ -4,29 +4,7 @@ const router = express.Router();
 const User = require('../models/User');
 const Task = require('../models/Task');
 const { protect } = require('../middleware/authMiddleware');
-
-const DEPARTMENTS = [
-  'Platform and DevOps',
-  'Core Systems',
-  'Hardware & Integration',
-  'Robotics & Simulation',
-  'AI/LLM & Perception',
-  'Management',
-  'CEO'
-];
-
-const DEPARTMENT_RENAMES = {
-  Operations: 'Platform and DevOps',
-  Engineering: 'Core Systems',
-  Design: 'Hardware & Integration',
-  Sales: 'Robotics & Simulation',
-  HR: 'Robotics & Simulation',
-  Finance: 'Robotics & Simulation',
-  Executive: 'Platform and DevOps',
-  Marketing: 'AI/LLM & Perception'
-};
-
-const normalizeDepartment = (department) => DEPARTMENT_RENAMES[department] || department;
+const { DEPARTMENTS, normalizeDepartment } = require('../config/departments');
 
 router.get('/', protect, async (req, res) => {
   try {

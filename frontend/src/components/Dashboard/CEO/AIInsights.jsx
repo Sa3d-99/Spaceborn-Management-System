@@ -1,5 +1,6 @@
 // src/components/Dashboard/CEO/AIInsights.jsx
 import React, { useState, useEffect } from 'react';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const AIInsights = ({ userRole = 'CEO' }) => {
   const [selectedMember, setSelectedMember] = useState(null);
@@ -574,7 +575,7 @@ const AIInsights = ({ userRole = 'CEO' }) => {
                         </div>
                         <div>
                           <p className="font-medium text-gray-900">{member.name}</p>
-                          <p className="text-xs text-gray-500">{member.role}</p>
+                          <p className="text-xs text-gray-500">{roleLabel(member.role)}</p>
                         </div>
                       </div>
                       <div className="text-right">
@@ -609,7 +610,7 @@ const AIInsights = ({ userRole = 'CEO' }) => {
                       </div>
                       <div>
                         <h3 className="font-semibold text-gray-900 text-lg">{selectedMember.name}</h3>
-                        <p className="text-sm text-gray-500">{selectedMember.role} · {selectedMember.department}</p>
+                        <p className="text-sm text-gray-500">{roleLabel(selectedMember.role)} · {selectedMember.department}</p>
                         {getStatusBadge(selectedMember.status)}
                       </div>
                     </div>
@@ -814,7 +815,7 @@ const AIInsights = ({ userRole = 'CEO' }) => {
                   <div className="flex justify-between items-start">
                     <div>
                       <h3 className="font-semibold text-gray-900 text-lg">{summary.name}</h3>
-                      <p className="text-sm text-gray-500">{summary.role} · {summary.department}</p>
+                      <p className="text-sm text-gray-500">{roleLabel(summary.role)} · {summary.department}</p>
                     </div>
                     <div className="text-right">
                       <p className="text-xs text-gray-400">{summary.date}</p>

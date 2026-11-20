@@ -1,6 +1,7 @@
 // src/components/Login/LogoutButton.jsx
 import React, { useState } from 'react';
 import authService from '../../services/authService';
+import { roleLabel } from '../../utils/roleLabels';
 
 const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -53,9 +54,9 @@ const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
   };
 
   const getUserRole = () => {
-    if (userRole) return userRole;
+    if (userRole) return roleLabel(userRole);
     const user = authService.getCurrentUser();
-    return user?.role || 'User';
+    return roleLabel(user?.role) || 'User';
   };
 
   const getUserName = () => {

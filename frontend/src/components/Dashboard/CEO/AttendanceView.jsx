@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 import attendanceService from '../../../services/attendanceService';
+import { roleLabel } from '../../../utils/roleLabels';
+import { DEPARTMENTS } from '../../../utils/departments';
 
 const AttendanceView = ({ userRole = 'CEO' }) => {
   const [attendanceRecords, setAttendanceRecords] = useState([]);
@@ -121,7 +123,7 @@ const records = await attendanceService.getAttendanceRoster(filters);
       }
     } catch (error) {
       console.error('Error fetching departments:', error);
-      setDepartments(['Platform and DevOps', 'Core Systems', 'Hardware & Integration', 'Robotics & Simulation', 'AI/LLM & Perception']);
+      setDepartments([...DEPARTMENTS]);
     }
   };
 
@@ -346,7 +348,7 @@ const records = await attendanceService.getAttendanceRoster(filters);
   .join('')}                  </div>
                   <div>
                     <p className="font-medium text-gray-900">{record.name}</p>
-                    <p className="text-xs text-gray-500">{record.role} · {record.department}</p>
+                    <p className="text-xs text-gray-500">{roleLabel(record.role)} · {record.department}</p>
                     <span className={`inline-block mt-1 px-2 py-0.5 rounded-full text-xs font-medium ${getStatusBadge(record.status)}`}>
                       {record.status.replace('-', ' ')}
                     </span>
@@ -407,7 +409,7 @@ const records = await attendanceService.getAttendanceRoster(filters);
                       </div>
                     </td>
                     <td className="px-6 py-4 text-sm text-gray-600">{record.department}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{record.role}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{roleLabel(record.role)}</td>
                     <td className="px-6 py-4">
                       <span className={`px-2 py-1 rounded-full text-xs font-medium ${getStatusBadge(record.status)}`}>
                         {record.status.replace('-', ' ')}

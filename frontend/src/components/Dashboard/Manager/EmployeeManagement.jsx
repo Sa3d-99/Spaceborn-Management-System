@@ -9,6 +9,8 @@ import {
 } from '../../../data/employeeData';
 import employeeService from '../../../services/employeeService';
 import { useGoogleLogin } from '@react-oauth/google';
+import ImportEmployeesModal from './ImportEmployeesModal';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const EmployeeManagement = ({ 
   employees = [], 
@@ -20,7 +22,8 @@ const EmployeeManagement = ({
   canAdd,
   onUpdateEmployee,
   onAddEmployee,
-  onDeleteEmployee 
+  onDeleteEmployee,
+  onImportComplete
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('all');
@@ -28,6 +31,7 @@ const EmployeeManagement = ({
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [showImportModal, setShowImportModal] = useState(false);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [uploadingDocType, setUploadingDocType] = useState('');
   const [activeTab, setActiveTab] = useState('personal');
@@ -296,7 +300,7 @@ const EmployeeManagement = ({
           <span className="text-gray-500 mr-2">Employees by Role:</span>
           {Object.entries(roleCounts).map(([role, count]) => (
             <span key={role} className={`px-2 py-1 rounded ${getRoleBadge(role)}`}>
-              {role} ({count})
+              {roleLabel(role)} ({count})
             </span>
           ))}
         </div>
@@ -344,6 +348,18 @@ const EmployeeManagement = ({
           
           {canAdd && (
             <button
+              onClick={() => setShowImportModal(true)}
+              className="px-4 py-2 border border-purple-600 text-purple-700 rounded-lg hover:bg-purple-50 transition-colors flex items-center space-x-2"
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4m0 0L8 8m4-4v12" />
+              </svg>
+              <span>Import from Excel</span>
+            </button>
+          )}
+
+          {canAdd && (
+            <button
               onClick={handleAddEmployee}
               className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
             >
@@ -386,11 +402,11 @@ const EmployeeManagement = ({
                     </div>
                     <div className="text-xs text-gray-500 mt-1">{employee.isOnline ? 'Online now' : `Last seen ${employee.lastSeen ? new Date(employee.lastSeen).toLocaleString() : 'recently'}`}</div>
                   </td>
-                  <td className="px-6 py-4 text-sm text-gray-600">{employee.id || employee.employeeId}</td>
+                  <td className="px-6 py-4 text-sm text-gray-600">{employee.employeeId || employee.id}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{employee.department}</td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getRoleBadge(employee.role || employee.designation)}`}>
-                      {employee.role || employee.designation}
+                      {roleLabel(employee.role) || employee.designation}
                     </span>
                   </td>
                   <td className="px-6 py-4">
@@ -459,7 +475,7 @@ const EmployeeManagement = ({
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{selectedEmployee.name}</h2>
                     <p className="text-gray-500">{selectedEmployee.designation || selectedEmployee.role} · {selectedEmployee.department}</p>
-                    <p className="text-sm text-gray-400">ID: {selectedEmployee.id || selectedEmployee.employeeId}</p>
+                    <p className="text-sm text-gray-400">ID: {selectedEmployee.employeeId || selectedEmployee.id}</p>
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -679,7 +695,7 @@ const EmployeeManagement = ({
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm text-gray-500">Employee ID</label>
-                          <p className="text-gray-900 font-mono">{selectedEmployee.credentials?.employeeId || selectedEmployee.id}</p>
+                          <p className="text-gray-900 font-mono">{selectedEmployee.credentials?.employeeId || selectedEmployee.employeeId || selectedEmployee.id}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Last Login</label>
@@ -916,6 +932,13 @@ const EmployeeManagement = ({
             </div>
           </div>
         </div>
+      )}
+
+      {showImportModal && (
+        <ImportEmployeesModal
+          onClose={() => setShowImportModal(false)}
+          onImported={() => onImportComplete && onImportComplete()}
+        />
       )}
 
       {/* Add Employee Modal */}
