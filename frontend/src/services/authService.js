@@ -400,7 +400,7 @@ class AuthService {
   }
 
   // Verify token and get user data
-  async verifyToken() {
+  async verifyToken({ signal } = {}) {
     if (this.USE_MOCK) {
       return await this.mockVerifyToken();
     }
@@ -411,12 +411,13 @@ class AuthService {
       return { success: false, error: 'No authentication token found' };
     }
 
-    const session = localStorage.getItem('userSession');
-    if (session) {
+    const storedSession = localStorage.getItem('userSession');
+    let session = {};
+    if (storedSession) {
       try {
-        const sessionData = JSON.parse(session);
-        const sessionAge = Date.now() - sessionData.timestamp;
-        const timeout = sessionData.rememberMe ? sessionData.sessionDuration : this.SESSION_TIMEOUT;
+        session = JSON.parse(storedSession);
+        const sessionAge = Date.now() - session.timestamp;
+        const timeout = session.rememberMe ? session.sessionDuration : this.SESSION_TIMEOUT;
         
         if (sessionAge >= timeout) {
           this.clearSession();
@@ -430,36 +431,37 @@ class AuthService {
     }
 
     try {
-      const response = await fetch(`${this.API_BASE_URL}/auth/verify`, {
+      const response = await fetch(`${this.API_BASE_URL.replace(/\/+$/, '')}/auth/verify`, {
         method: 'GET',
         headers: this.getAuthHeaders(),
+        signal
       });
 
+      if (signal?.aborted) throw new Error('Session check canceled');
+      if (this.getToken() !== token) return { success: false, error: 'Session changed' };
+      if (response.status === 401) {
+        this.clearSession();
+        return { success: false, error: 'Session expired. Sign in again.' };
+      }
+      if (!response.ok) throw new Error('Token verification failed');
+
       const data = await response.json();
+      const user = data.data ?? data.user;
+      if (!data.success || !user?.role) throw new Error('Token verification response is incomplete');
+      if (signal?.aborted) throw new Error('Session check canceled');
+      if (this.getToken() !== token) return { success: false, error: 'Session changed' };
 
-      if (!response.ok) {
-        if (response.status === 401) {
-          this.clearSession();
-          throw new Error('Session expired. Please login again');
-        }
-        throw new Error(data.message || 'Token verification failed');
-      }
-
-      if (data.user) {
-        const currentSession = JSON.parse(localStorage.getItem('userSession') || '{}');
-        localStorage.setItem('userSession', JSON.stringify({
-          ...data.user,
-          isAuthenticated: true,
-          timestamp: Date.now(),
-          sessionDuration: currentSession.sessionDuration || this.SESSION_TIMEOUT,
-          rememberMe: currentSession.rememberMe || false
-        }));
-      }
-
-      return { success: true, user: data.user };
-    } catch (error) {
-      console.error('Token verification error:', error);
-      return { success: false, error: error.message };
+      const normalizedUser = normalizeDepartmentFields(user);
+      localStorage.setItem('user', JSON.stringify(normalizedUser));
+      localStorage.setItem('userSession', JSON.stringify({
+        ...session,
+        ...normalizedUser,
+        isAuthenticated: true,
+        timestamp: session.timestamp ?? Date.now()
+      }));
+      return { success: true, user: normalizedUser };
+    } catch {
+      return { success: false, retryable: true, error: 'Could not verify your session. Try again.' };
     }
   }
 

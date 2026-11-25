@@ -1,6 +1,6 @@
 import { BarChart3 as IconBarChart3, Bell as IconBell, Briefcase as IconBriefcase, Calendar as IconCalendar, Clock as IconClock, FileText as IconFileText, Home as IconHome, Idea as IconIdea, Inbox as IconInbox, Tasks as IconTasks, User as IconUser, UserPlus as IconUserPlus, Lock as IconLock, Users as IconUsers, Zap as IconZap } from './components/Common/Icons';
 // src/App.js
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import spacebornLogo from './assets/spaceborn-logo.png';
 import ShiftTimer from './components/Common/ShiftTimer';
 import ResourceReview from './components/Common/ResourceReview';
@@ -85,9 +85,24 @@ import MemberNotifications from './components/Dashboard/Member/Notifications.jsx
 import MemberProfileView from './components/Dashboard/Member/MemberProfileView';
 import { roleLabel } from './utils/roleLabels';
 
+const publicAuthPages = new Set(['/signup', '/forgot-password', '/reset-password']);
+const dashboardMenuKey = user => `spaceborn:dashboard:${user.id}:${user.role}:${window.location.pathname}`;
+
+function readDashboardMenus(user) {
+  try {
+    return JSON.parse(sessionStorage.getItem(dashboardMenuKey(user))) || {};
+  } catch {
+    return {};
+  }
+}
+
 function App() {
   const [user, setUser] = useState(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [sessionRestore, setSessionRestore] = useState(() => {
+    const path = window.location.pathname.replace(/\/+$/, '');
+    return authService.getToken() && !publicAuthPages.has(path) ? 'checking' : 'ready';
+  });
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [navigationOpen, setNavigationOpen] = useState(false);
   const [completedActions, setCompletedActions] = useState([]);
@@ -99,7 +114,7 @@ function App() {
   const [employees, setEmployees] = useState([]);
 
   // Fetch employees using employeeService
-  const fetchEmployees = async () => {
+  const fetchEmployees = useCallback(async () => {
     try {
       const data = await employeeService.getAllEmployees();
       setEmployees(data);
@@ -118,45 +133,12 @@ function App() {
         { id: 10, name: 'Anil Mehta', role: 'Team Lead', department: 'Hardware & Integration', email: 'anil.mehta@spaceborn.com', employeeId: 'LD003', phone: '+1 (555) 000-0010', joinDate: '2021-06-10', status: 'Active', manager: 'Jane Smith' },
       ]);
     }
-  };
+  }, []);
 
   const getUserDepartment = () => {
     if (!user) return null;
     return user.department || null;
   };
-
-  // Check for existing session on mount - DISABLED for dev mode
-  useEffect(() => {
-    const checkExistingSession = () => {
-      const savedUser = localStorage.getItem('user');
-      const session = localStorage.getItem('userSession');
-      
-      if (savedUser && session) {
-        try {
-          const userData = normalizeDepartmentFields(JSON.parse(savedUser));
-          const sessionData = JSON.parse(session);
-          const sessionAge = Date.now() - sessionData.timestamp;
-          const SESSION_TIMEOUT = 8 * 60 * 60 * 1000;
-          
-          if (sessionAge < SESSION_TIMEOUT) {
-            console.log('Found existing session for:', userData.name);
-            setUser(userData);
-            setIsLoggedIn(true);
-            fetchEmployees();
-          } else {
-            localStorage.removeItem('user');
-            localStorage.removeItem('userSession');
-            localStorage.removeItem('rememberedEmployeeId');
-          }
-        } catch (error) {
-          console.error('Error parsing session:', error);
-        }
-      }
-    };
-    
-    // COMMENT THIS LINE TO DISABLE AUTO-LOGIN - Forces login page every time
-    // checkExistingSession();  // <-- COMMENT THIS FOR DEV MODE (forces login)
-  }, []);
 
   const handleTimeZoneChange = timeZone => {
     const updated = { ...user, timeZone };
@@ -165,9 +147,7 @@ function App() {
     setUser(updated);
   };
 
-  const handleLoginSuccess = async (userData, openTeam = false) => {
-    console.log('Login success received in App:', userData);
-    
+  const handleLoginSuccess = useCallback((userData, openTeam = false, menus = {}) => {
     if (!userData || !userData.role) {
       console.error('Invalid user data received:', userData);
       return;
@@ -178,13 +158,54 @@ function App() {
     localStorage.setItem('user', JSON.stringify(normalizedUserData));
     setUser(normalizedUserData);
     setIsLoggedIn(true);
-    setActiveMenu(userData.role === 'CEO' && window.location.pathname === '/signup-requests' ? 'SignupRequests' : 'Dashboard');
-    if (openTeam && userData.role === 'Member') setMemberActiveMenu('MyTeam');
-    await fetchEmployees();
-  };
+    const ceoDefault = userData.role === 'CEO' && window.location.pathname === '/signup-requests' ? 'SignupRequests' : 'Dashboard';
+    setActiveMenu(menus.executive || ceoDefault);
+    setManagerActiveMenu(menus.manager || 'Dashboard');
+    setTeamLeadActiveMenu(menus.teamLead || 'Dashboard');
+    setMemberActiveMenu(openTeam && userData.role === 'Member' ? 'MyTeam' : menus.member || 'Dashboard');
+    fetchEmployees();
+  }, [fetchEmployees]);
+
+  useEffect(() => {
+    if (sessionRestore !== 'checking') return;
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+    let canceled = false;
+
+    async function restoreSession() {
+      try {
+        const result = await authService.verifyToken({ signal: controller.signal });
+        if (canceled) return;
+        if (result.success) handleLoginSuccess(result.user, false, readDashboardMenus(result.user));
+        setSessionRestore(result.retryable ? 'unavailable' : 'ready');
+      } catch {
+        if (!canceled) setSessionRestore('unavailable');
+      } finally {
+        clearTimeout(timeout);
+      }
+    }
+
+    restoreSession();
+    return () => {
+      canceled = true;
+      clearTimeout(timeout);
+      controller.abort();
+    };
+  }, [sessionRestore, handleLoginSuccess]);
+
+  useEffect(() => {
+    if (!user) return;
+    sessionStorage.setItem(dashboardMenuKey(user), JSON.stringify({
+      executive: activeMenu,
+      manager: managerActiveMenu,
+      teamLead: teamLeadActiveMenu,
+      member: memberActiveMenu
+    }));
+  }, [user, activeMenu, managerActiveMenu, teamLeadActiveMenu, memberActiveMenu]);
 
   const handleLogout = async () => {
     await authService.logout();
+    if (user) sessionStorage.removeItem(dashboardMenuKey(user));
     localStorage.removeItem('userSession');
     localStorage.removeItem('user');
     localStorage.removeItem('authToken');
@@ -291,7 +312,25 @@ function App() {
     }
   };
 
-  // Show login page if not logged in
+  if (sessionRestore !== 'ready') {
+    return (
+      <main className="grid min-h-screen place-items-center bg-base-200 p-4">
+        {sessionRestore === 'checking' ? (
+          <p className="flex items-center gap-3" role="status">
+            <span className="loading loading-spinner" aria-hidden="true" /> Checking your session…
+          </p>
+        ) : (
+          <section className="card border border-base-300 bg-base-100">
+            <div className="card-body">
+              <p role="alert">Could not verify your session.</p>
+              <button type="button" className="btn btn-neutral self-start" onClick={() => setSessionRestore('checking')}>Try again</button>
+            </div>
+          </section>
+        )}
+      </main>
+    );
+  }
+
   if (!isLoggedIn || !user) {
     return <LoginSystem onLoginSuccess={handleLoginSuccess} />;
   }
