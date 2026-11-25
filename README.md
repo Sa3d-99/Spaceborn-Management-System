@@ -6,7 +6,7 @@ Internal operations and employee management portal for tracking daily tasks, att
 
 Sign in with your registered email or employee ID. New members select **Request an account**. The CEO reviews requests under **Signup requests**. The CRM saves requests even if email is unavailable and emails the administrator when delivery is configured. Approval requires Resend settings so the applicant can receive a single-use link to set a password and get Intern access.
 
-For a local demo, start with `SEED_DEMO_DATA=true` and an empty database. The demo CEO email is `john.doe@spaceborn.com`, employee ID `CEO001`, and password `admin123`. Keep the demo bound to your local machine.
+For a local demo, start with `SEED_DEMO_DATA=true` and an empty database. Sign in to the demo CEO account with employee ID `CEO001` and password `admin123`. Keep the demo bound to your local machine.
 
 ## Features
 

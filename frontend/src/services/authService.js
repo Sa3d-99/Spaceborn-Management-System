@@ -26,7 +26,7 @@ class AuthService {
         name: 'John Doe',
         role: 'CEO',
         department: 'Platform and DevOps',
-        email: 'john.doe@spaceborn.com',
+        email: '',
         phone: '+1 555 000 0001',
         joinDate: '2020-01-01',
         status: 'Active',

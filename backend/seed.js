@@ -13,7 +13,7 @@ const INITIAL_USERS = [
     firstName: 'John',
     lastName: 'Doe',
     fullName: 'John Doe',
-    email: 'john.doe@spaceborn.com',
+    email: '',
     phone: '+1 555 000 0001',
     role: 'CEO',
     department: 'Platform and DevOps',
