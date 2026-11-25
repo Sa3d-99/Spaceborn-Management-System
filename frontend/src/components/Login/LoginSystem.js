@@ -11,6 +11,7 @@ const currentPath = () => window.location.pathname.replace(/\/+$/, '') || '/';
 
 const LoginSystem = ({ onLoginSuccess }) => {
   const [employeeId, setEmployeeId] = useState('');
+  const [setupEmployeeId, setSetupEmployeeId] = useState(null);
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -66,9 +67,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
     }
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    
+  const signIn = async (identifier, enteredPassword, openTeam = false) => {
     const lockStatus = isAccountLocked();
     if (lockStatus.locked) {
       setError(`Too many failed attempts. Account locked for ${lockStatus.remainingMinutes} minutes.`);
@@ -85,8 +84,8 @@ const LoginSystem = ({ onLoginSuccess }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          employeeId: employeeId.trim(),
-          password: password 
+          employeeId: identifier.trim(),
+          password: enteredPassword
         }),
       });
 
@@ -135,12 +134,13 @@ const LoginSystem = ({ onLoginSuccess }) => {
       }));
 
       if (rememberMe) {
-        localStorage.setItem('rememberedEmployeeId', employeeId);
+        localStorage.setItem('rememberedEmployeeId', identifier);
       } else {
         localStorage.removeItem('rememberedEmployeeId');
       }
 
-      onLoginSuccess(user);
+      if (openTeam) navigate('/', true);
+      onLoginSuccess(user, openTeam);
       markAttendance(user, token);
       
     } catch (error) {
@@ -151,6 +151,16 @@ const LoginSystem = ({ onLoginSuccess }) => {
     }
   };
 
+  const handleSubmit = event => {
+    event.preventDefault();
+    signIn(employeeId, password, employeeId.trim().toUpperCase() === setupEmployeeId);
+  };
+
+  const handleSetupComplete = async (identifier, newPassword) => {
+    setSetupEmployeeId(identifier);
+    setEmployeeId(identifier);
+    await signIn(identifier, newPassword, true);
+  };
 
   const navigate = (path, replace = false) => {
     if (replace) window.history.replaceState(window.history.state, '', path);
@@ -170,7 +180,8 @@ const LoginSystem = ({ onLoginSuccess }) => {
     return <ForgotPassword initialEmployeeId={employeeId} onBackToLogin={handleBackToLogin} />;
   }
   if (pathname === '/reset-password') {
-    return <ResetPassword onBackToLogin={handleBackToLogin} onRequestNewLink={() => navigate('/forgot-password', true)} />;
+    return <ResetPassword onBackToLogin={handleBackToLogin} onSetupComplete={handleSetupComplete}
+      onRequestNewLink={() => navigate('/forgot-password', true)} />;
   }
 
   return (

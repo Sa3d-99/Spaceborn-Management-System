@@ -155,7 +155,7 @@ Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `APP_URL` in the root `.env`. Use
 
 **Forgot password** is available from sign-in and directly at `/forgot-password`. The Spaceborn email includes a **Reset Password** button and a plain-text fallback. The link expires after 30 minutes and can be used once. The reset page validates the link before showing the password form and offers a fresh request when the link is invalid, expired, or used. A successful reset revokes older sessions. New passwords accept 15–128 characters and passphrases.
 
-When the CEO approves a signup, Resend sends the applicant their employee ID and a **Create Password** button. The link opens the same password form and expires after 30 minutes. If delivery fails or the link expires, the CEO can select **Resend setup link** in **Signup requests**.
+When the CEO approves a signup, Resend sends the applicant their employee ID and a **Create Password** button. The link expires after 30 minutes. Creating the password assigns the chosen department, then signs the new member in and opens **My Team**. In **Signup requests**, the CEO can resend an unfinished setup link, select **Approve again** if the linked employee account was removed, or delete the request record. Employee accounts are managed separately.
 
 For a Vercel-hosted frontend, set the API's `APP_URL` to the frontend's public HTTPS origin. Keep the Resend key and sender in the API environment, and build the frontend with `REACT_APP_API_URL` set to that API's HTTPS address ending in `/api`. The frontend's Vercel rewrite serves both recovery URLs directly. Keep click tracking disabled so reset links lead straight to the CRM. [Resend tracking settings](https://resend.com/blog/open-and-click-tracking)
 

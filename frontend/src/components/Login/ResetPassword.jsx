@@ -8,7 +8,7 @@ function getResetToken() {
   return new URLSearchParams(window.location.hash.slice(1)).get('token');
 }
 
-export default function ResetPassword({ onBackToLogin, onRequestNewLink }) {
+export default function ResetPassword({ onBackToLogin, onRequestNewLink, onSetupComplete }) {
   const [token] = useState(getResetToken);
   const hasToken = /^[a-f0-9]{64}$/.test(token || '');
   const [linkState, setLinkState] = useState(hasToken ? 'checking' : 'invalid');
@@ -66,6 +66,9 @@ export default function ResetPassword({ onBackToLogin, onRequestNewLink }) {
       setPassword('');
       setConfirmation('');
       setMessage(result.message);
+      if (result.data?.setupEmployeeId) {
+        await onSetupComplete?.(result.data.setupEmployeeId, password);
+      }
     } catch (err) {
       if (err.code === 'INVALID_RESET_LINK') {
         setPassword('');
@@ -112,7 +115,7 @@ export default function ResetPassword({ onBackToLogin, onRequestNewLink }) {
           </button>
         </form>
       )}
-      <button type="button" className={`btn self-start ${message ? 'btn-neutral' : 'btn-ghost'}`} onClick={onBackToLogin}>
+      <button type="button" className={`btn self-start ${message ? 'btn-neutral' : 'btn-ghost'}`} onClick={onBackToLogin} disabled={loading}>
         {message ? 'Sign in' : 'Back to sign in'}
       </button>
     </PasswordRecoveryLayout>

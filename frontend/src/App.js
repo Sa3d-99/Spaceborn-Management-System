@@ -77,6 +77,7 @@ import MVPRoadmap from './components/Dashboard/TeamLead/MVPRoadmap';
 
 // Member Imports
 import MemberDashboard from './components/Dashboard/Member/MemberDashboard';
+import MyTeam from './components/Dashboard/Member/MyTeam';
 import MemberTaskManagement from './components/Dashboard/Member/TaskManagement';
 import MemberResources from './components/Dashboard/Member/Resources';
 import MemberMeetings from './components/Dashboard/Member/Meetings';
@@ -164,7 +165,7 @@ function App() {
     setUser(updated);
   };
 
-  const handleLoginSuccess = async (userData) => {
+  const handleLoginSuccess = async (userData, openTeam = false) => {
     console.log('Login success received in App:', userData);
     
     if (!userData || !userData.role) {
@@ -178,6 +179,7 @@ function App() {
     setUser(normalizedUserData);
     setIsLoggedIn(true);
     setActiveMenu(userData.role === 'CEO' && window.location.pathname === '/signup-requests' ? 'SignupRequests' : 'Dashboard');
+    if (openTeam && userData.role === 'Member') setMemberActiveMenu('MyTeam');
     await fetchEmployees();
   };
 
@@ -780,6 +782,13 @@ function App() {
                       <IconUser className="w-5 h-5" />
                       <span className="text-sm font-medium">My Profile</span>
                     </button>
+                    {user.role === 'Member' && (
+                      <button type="button" onClick={() => setMemberActiveMenu('MyTeam')} aria-current={memberActiveMenu === 'MyTeam' ? 'page' : undefined}
+                        className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'MyTeam' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
+                        <IconUsers className="w-5 h-5" />
+                        <span className="text-sm font-medium">My Team</span>
+                      </button>
+                    )}
                   </div>
                 </div>
                 <div className="mb-6">
@@ -843,6 +852,7 @@ function App() {
             <main className="min-w-0 flex-1 overflow-y-auto md:ml-64">
               <div className="p-4 sm:p-8">
                 {memberActiveMenu === 'Dashboard' && <MemberDashboard user={user} onLogout={handleLogout} />}
+                {memberActiveMenu === 'MyTeam' && <MyTeam />}
                 {memberActiveMenu === 'MyProfile' && memberData && (
                   <MemberProfileView 
                     userData={memberData}

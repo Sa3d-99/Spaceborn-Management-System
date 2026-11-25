@@ -30,6 +30,7 @@ router.get('/signup-requests', protect, authorize('CEO'), signup.list);
 router.post('/signup-requests/:id/approve', protect, authorize('CEO'), signup.approve);
 router.post('/signup-requests/:id/reject', protect, authorize('CEO'), signup.reject);
 router.post('/signup-requests/:id/resend', protect, authorize('CEO'), signup.resend);
+router.delete('/signup-requests/:id', protect, authorize('CEO'), signup.remove);
 router.post('/change-password', protect, authRateLimit(20, true), changePassword);
 
 router.post(

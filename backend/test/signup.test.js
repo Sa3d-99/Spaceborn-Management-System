@@ -54,13 +54,13 @@ after(async () => {
   if (database) await database.close();
 });
 
-async function request(path, { token, body } = {}) {
+async function request(path, { token, body, method = body ? 'POST' : 'GET' } = {}) {
   const headers = {};
   if (body) headers['Content-Type'] = 'application/json';
   if (token) headers.Authorization = `Bearer ${token}`;
 
   const response = await fetchLocal(`http://127.0.0.1:${server.address().port}/api/auth${path}`, {
-    method: body ? 'POST' : 'GET',
+    method,
     headers,
     body: JSON.stringify(body)
   });
@@ -124,6 +124,7 @@ test('public signup requires CEO approval and emailed password setup before logi
   assert.ok(employeeId, 'Approval returns the assigned employee ID');
   assert.equal(emailSent, true);
   assert.equal((await request('/login', { body: { employeeId, password } })).status, 401);
+  assert.equal((await User.findOne({ email: applicant.email })).department, undefined);
 
   const email = await waitForEmail(message => recipientMatches(message, applicant.email));
   assert.equal(email.subject, 'Your Spaceborn signup was approved');
@@ -142,12 +143,23 @@ test('public signup requires CEO approval and emailed password setup before logi
   assert.ok(!JSON.stringify(approval.body).includes(token));
 
   assert.equal((await request('/reset-password/validate', { body: { token } })).status, 200);
-  assert.equal((await request('/reset-password', { body: { token, newPassword: password } })).status, 200);
+  const setup = await request('/reset-password', { body: { token, newPassword: password } });
+  assert.equal(setup.status, 200);
+  assert.equal(setup.body.data.setupEmployeeId, employeeId);
   assert.equal((await request('/reset-password/validate', { body: { token } })).status, 400);
   const login = await request('/login', { body: { employeeId, password } });
   assert.equal(login.status, 200);
   assert.equal(login.body.data.user.role, 'Member');
   assert.equal(login.body.data.user.department, applicant.department);
+  await User.create({
+    employeeId: 'INTOTHER', firstName: 'Other', lastName: 'Team', department: 'Neural AI',
+    email: 'other-team@example.test', password
+  });
+  const team = await fetchLocal(`http://127.0.0.1:${server.address().port}/api/team-members/mine?department=Neural%20AI`, {
+    headers: { Authorization: `Bearer ${login.body.data.token}` }
+  });
+  assert.equal(team.status, 200);
+  assert.deepEqual((await team.json()).data.members.map(entry => entry.id), [login.body.data.user.id]);
 });
 
 test('a failed setup email leaves the signup approved and can be resent', async () => {
@@ -164,7 +176,9 @@ test('a failed setup email leaves the signup approved and can be resent', async 
   assert.equal(approval.body.data.emailSent, false);
   assert.match(approval.body.message, /Resend setup link/);
   assert.equal((await request(`${action}/approve`, adminAction)).status, 409);
-  assert.equal((await request(`${action}/resend`, adminAction)).status, 409);
+  const cooldown = await request(`${action}/resend`, adminAction);
+  assert.equal(cooldown.status, 409);
+  assert.match(cooldown.body.message, /wait one minute/i);
 
   const rejected = emails.find(message => recipientMatches(message, applicant.email));
   const token = rejected.text.match(/#token=([a-f0-9]{64})/)[1];
@@ -185,6 +199,9 @@ test('a failed setup email leaves the signup approved and can be resent', async 
   const newToken = resent.text.match(/#token=([a-f0-9]{64})/)[1];
   assert.notEqual(newToken, token);
   assert.equal((await request('/reset-password', { body: { token: newToken, newPassword: password } })).status, 200);
+  const completed = await request(`${action}/resend`, adminAction);
+  assert.equal(completed.status, 409);
+  assert.match(completed.body.message, /already created a password/i);
 });
 
 test('concurrent requests for the same email produce one pending signup and one admin email', async () => {
@@ -230,4 +247,33 @@ test('signup reaches the CEO queue without Resend and can notify the CEO after c
   const entries = reviewedQueue.body.data.filter(entry => entry.email === applicant.email);
   assert.deepEqual(entries.map(entry => entry.id), [queued.id]);
   assert.equal(emails.filter(matches).length, 1);
+});
+
+test('a CEO can approve again when an approved request has lost its linked account', async () => {
+  const applicant = { name: 'Restore Applicant', email: 'restore@example.test', department: 'Sensor Stack' };
+  const admin = { token: ceoToken, body: {} };
+  assert.equal((await request('/signup', { body: applicant })).status, 202);
+  const list = () => request('/signup-requests', { token: ceoToken });
+  const { id } = (await list()).body.data.find(entry => entry.email === applicant.email);
+  const action = `/signup-requests/${id}`;
+  const first = await request(`${action}/approve`, admin);
+  assert.equal(first.status, 200);
+  await User.findByIdAndDelete((await User.findOne({ email: applicant.email })).id);
+
+  const orphan = (await list()).body.data.find(entry => entry.id === id);
+  assert.equal(orphan.setupStatus, 'missing-account');
+  const resend = await request(`${action}/resend`, admin);
+  assert.equal(resend.status, 409);
+  assert.match(resend.body.message, /Approve again/);
+  assert.equal(await User.findOne({ email: applicant.email }), null);
+  const restored = await request(`${action}/approve`, admin);
+  assert.equal(restored.status, 200);
+  assert.equal(restored.body.data.emailSent, true);
+  assert.notEqual(restored.body.data.employeeId, first.body.data.employeeId);
+
+  assert.equal((await request(action, { token: managerToken, method: 'DELETE' })).status, 403);
+  assert.equal((await request(action, { token: ceoToken, method: 'DELETE' })).status, 200);
+  assert.ok(!(await list()).body.data.some(entry => entry.id === id));
+  assert.ok(await User.findOne({ email: applicant.email }));
+  assert.equal((await request(action, { token: ceoToken, method: 'DELETE' })).status, 404);
 });

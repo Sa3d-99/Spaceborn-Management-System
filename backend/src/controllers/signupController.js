@@ -6,6 +6,23 @@ const { emailSetupLink } = require('../services/passwordResetService');
 const { formatResponse } = require('../utils/helpers');
 
 const validEmail = email => email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+const requestsWithSetupStatus = `
+  SELECT request.*, CASE
+    WHEN request.status <> 'approved' THEN NULL
+    WHEN employee.id IS NULL THEN 'missing-account'
+    WHEN employee.data->>'isActive' = 'false' THEN 'inactive'
+    WHEN COALESCE(employee.data->>'password', '') <> '' THEN 'complete'
+    WHEN COALESCE(employee.data->>'email', '') = '' THEN 'missing-email'
+    ELSE 'awaiting-password'
+  END AS setup_status
+  FROM signup_requests request LEFT JOIN users employee ON employee.id = request.user_id
+`;
+const setupUnavailable = {
+  'missing-account': 'The linked employee account was removed. Select Approve again to send a new setup link.',
+  inactive: 'This employee account is inactive. Activate it before sending a setup link.',
+  complete: 'This member has already created a password. They can use Forgot password to change it.',
+  'missing-email': 'Add an email address to the employee account before sending a setup link.'
+};
 const dto = row => ({
   id: row.id,
   name: row.full_name,
@@ -14,7 +31,8 @@ const dto = row => ({
   status: row.status,
   requestedAt: row.requested_at,
   reviewedAt: row.reviewed_at,
-  employeeId: row.employee_id
+  employeeId: row.employee_id,
+  setupStatus: row.setup_status
 });
 
 async function adminEmail() {
@@ -69,7 +87,7 @@ exports.signup = async (req, res) => {
 };
 
 exports.list = async (_req, res) => {
-  const { rows } = await query("SELECT * FROM signup_requests ORDER BY (status = 'pending') DESC, requested_at DESC");
+  const { rows } = await query(`${requestsWithSetupStatus} ORDER BY (request.status = 'pending') DESC, request.requested_at DESC`);
   return res.json(formatResponse(true, 'Signup requests fetched.', rows.map(dto)));
 };
 
@@ -83,7 +101,11 @@ exports.approve = async (req, res) => {
       UPDATE signup_requests
       SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(), user_id = $3,
           employee_id = 'INTS' || nextval('signup_employee_ids')::text
-      WHERE id = $1 AND status = 'pending'
+      WHERE id = $1 AND (
+        status = 'pending' OR (
+          status = 'approved' AND NOT EXISTS (SELECT 1 FROM users WHERE id = signup_requests.user_id)
+        )
+      )
         AND NOT EXISTS (SELECT 1 FROM users WHERE LOWER(data->>'email') = signup_requests.email)
       RETURNING email, full_name, department, employee_id
     )
@@ -92,7 +114,7 @@ exports.approve = async (req, res) => {
       '_id', $3::text, 'id', $3::text, 'email', email, 'employeeId', employee_id,
       'fullName', full_name, 'firstName', split_part(full_name, ' ', 1),
       'lastName', trim(substring(full_name FROM length(split_part(full_name, ' ', 1)) + 1)),
-      'department', department, 'role', 'Member', 'isActive', true,
+      'signupDepartment', department, 'role', 'Member', 'isActive', true,
       'isOnline', false, 'createdAt', NOW(), 'updatedAt', NOW()
     ) FROM approved RETURNING data->>'employeeId' AS "employeeId"
   `, [req.params.id, req.user.id, userId]);
@@ -109,12 +131,14 @@ exports.resend = async (req, res) => {
   const settings = emailSettings();
   if (!settings) return res.status(503).json(formatResponse(false, 'Signup email is unavailable.'));
   const { rows: [request] } = await query(
-    "SELECT user_id FROM signup_requests WHERE id = $1 AND status = 'approved'", [req.params.id]
+    `${requestsWithSetupStatus} WHERE request.id = $1 AND request.status = 'approved'`, [req.params.id]
   );
-  if (!request?.user_id) return res.status(404).json(formatResponse(false, 'Approved signup request not found.'));
+  if (!request) return res.status(404).json(formatResponse(false, 'Approved signup request not found.'));
+  const reason = setupUnavailable[request.setup_status];
+  if (reason) return res.status(409).json(formatResponse(false, reason));
   const delivery = await emailSetupLink(request.user_id, settings);
   if (delivery === 'unavailable') {
-    return res.status(409).json(formatResponse(false, 'Check that the account is active and try again after a minute.'));
+    return res.status(409).json(formatResponse(false, 'Wait one minute before retrying. Refresh the request if the setup status changed.'));
   }
   if (delivery === 'failed') {
     return res.status(502).json(formatResponse(false, 'Resend could not send the setup email. Check the Resend settings and try again.'));
@@ -129,4 +153,10 @@ exports.reject = async (req, res) => {
   `, [req.params.id, req.user.id]);
   if (!request) return res.status(409).json(formatResponse(false, 'This request already has a decision.'));
   return res.json(formatResponse(true, 'Signup request declined.', dto(request)));
+};
+
+exports.remove = async (req, res) => {
+  const { rows } = await query('DELETE FROM signup_requests WHERE id = $1 RETURNING id', [req.params.id]);
+  if (!rows.length) return res.status(404).json(formatResponse(false, 'Signup request not found.'));
+  return res.json(formatResponse(true, 'Signup request deleted.'));
 };

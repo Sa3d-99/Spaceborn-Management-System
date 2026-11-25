@@ -4,6 +4,13 @@ import { formatDateTime } from '../../../utils/formatters';
 
 const apiBase = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 const colors = { pending: 'badge-warning', approved: 'badge-success', rejected: 'badge-error' };
+const setupLabels = {
+  'missing-account': 'Employee account removed',
+  'missing-email': 'Employee email missing',
+  'awaiting-password': 'Waiting for password',
+  inactive: 'Employee account inactive',
+  complete: 'Password created'
+};
 
 async function signupRequest(path = '', method = 'GET') {
   const response = await fetch(`${apiBase}/auth/signup-requests${path}`, {
@@ -31,11 +38,14 @@ export default function SignupRequests() {
   useEffect(() => { refresh(); }, []);
 
   async function review(id, action) {
+    if (action === 'delete' && !window.confirm('Delete this signup request from the queue?')) return;
     setWorking(id);
     setNotice(null);
     setError('');
     try {
-      const result = await signupRequest(`/${id}/${action}`, 'POST');
+      const result = action === 'delete'
+        ? await signupRequest(`/${id}`, 'DELETE')
+        : await signupRequest(`/${id}/${action}`, 'POST');
       setNotice({ text: result.message, deliveryFailed: result.data?.emailSent === false });
       await refresh();
     } catch (err) {
@@ -70,9 +80,12 @@ export default function SignupRequests() {
                     </td>
                     <td>{request.department}</td>
                     <td>{formatDateTime(request.requestedAt)}</td>
-                    <td><span className={`badge ${colors[request.status]}`}>{request.status}</span></td>
                     <td>
-                      <div className="flex gap-2">
+                      <span className={`badge ${colors[request.status]}`}>{request.status}</span>
+                      {request.setupStatus && <p className="mt-1 text-sm text-base-content/70">{setupLabels[request.setupStatus]}</p>}
+                    </td>
+                    <td>
+                      <div className="flex flex-wrap gap-2">
                         {request.status === 'pending' && (
                           <>
                             <button type="button" className="btn btn-sm btn-success" disabled={working !== null}
@@ -81,10 +94,16 @@ export default function SignupRequests() {
                               onClick={() => review(request.id, 'reject')}>Decline</button>
                           </>
                         )}
-                        {request.status === 'approved' && (
+                        {request.setupStatus === 'missing-account' && (
+                          <button type="button" className="btn btn-sm btn-success" disabled={working !== null}
+                            onClick={() => review(request.id, 'approve')}>Approve again</button>
+                        )}
+                        {request.setupStatus === 'awaiting-password' && (
                           <button type="button" className="btn btn-sm btn-ghost" disabled={working !== null}
                             onClick={() => review(request.id, 'resend')}>Resend setup link</button>
                         )}
+                        <button type="button" className="btn btn-sm btn-outline btn-error" disabled={working !== null}
+                          onClick={() => review(request.id, 'delete')}>Delete request</button>
                       </div>
                     </td>
                   </tr>

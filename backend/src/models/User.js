@@ -49,7 +49,7 @@ const UserModel = createPgModel('users', {
       if (this.isActive === undefined) this.isActive = true;
       if (this.isOnline === undefined) this.isOnline = false;
       if (!this.role) this.role = 'Member';
-      if (!this.department) this.department = 'Core Systems';
+      if (!this.department && !this.signupDepartment) this.department = 'Core Systems';
     }
   ]
 });

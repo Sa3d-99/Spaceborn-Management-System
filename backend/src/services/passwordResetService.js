@@ -42,9 +42,10 @@ async function emailPasswordLink(accountLookup, identifier, settings, onboarding
       LIMIT 1
     )
       AND ${activeAccount}
+      AND (NOT $4::boolean OR COALESCE(data->>'password', '') = '')
       AND (password_reset_requested_at IS NULL OR password_reset_requested_at <= NOW() - INTERVAL '60 seconds')
     RETURNING data->>'email' AS email, data->>'employeeId' AS "employeeId"
-  `, [identifier, digest, expiresInMinutes]);
+  `, [identifier, digest, expiresInMinutes, onboarding]);
   if (!account) return 'unavailable';
 
   const url = new URL('/reset-password', settings.origin);
@@ -67,21 +68,35 @@ async function isResetLinkValid(token) {
 }
 
 async function redeemResetLink(token, password) {
-  if (!await isResetLinkValid(token)) return false;
+  if (!await isResetLinkValid(token)) return null;
 
   const passwordData = {
     password: await hashPassword(password),
     passwordVersion: randomUUID(),
     passwordChangedAt: Date.now()
   };
-  const updated = await query(`
+  const { rows: [updated] } = await query(`
+    WITH candidate AS (
+      SELECT id,
+        CASE WHEN COALESCE(data->>'password', '') = '' AND (
+          data ? 'signupDepartment' OR EXISTS (
+            SELECT 1 FROM signup_requests WHERE user_id = users.id AND status = 'approved'
+          )
+        ) THEN data->>'employeeId' END AS setup_employee_id,
+        COALESCE(data->>'department', data->>'signupDepartment') AS department
+      FROM users WHERE ${validReset}
+    )
     UPDATE users
-    SET data = data || $2::jsonb, updated_at = NOW(),
+    SET data = (data - 'signupDepartment') || $2::jsonb ||
+        CASE WHEN candidate.setup_employee_id IS NOT NULL AND candidate.department IS NOT NULL
+          THEN jsonb_build_object('department', candidate.department) ELSE '{}'::jsonb END,
+        updated_at = NOW(),
         password_reset_digest = NULL, password_reset_expires_at = NULL, password_reset_identity = NULL
-    WHERE ${validReset}
-    RETURNING id
+    FROM candidate
+    WHERE users.id = candidate.id AND ${validReset}
+    RETURNING candidate.setup_employee_id AS "setupEmployeeId"
   `, [hashToken(token), JSON.stringify(passwordData)]);
-  return updated.rows.length === 1;
+  return updated || null;
 }
 
 module.exports = { emailResetLink, emailSetupLink, isResetToken, isResetLinkValid, redeemResetLink };

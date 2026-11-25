@@ -198,7 +198,11 @@ exports.resetPassword = async (req, res) => {
   if (policyError) return res.status(400).json(formatResponse(false, policyError));
 
   try {
-    if (!await redeemResetLink(token, newPassword)) return invalidResetLink(res);
+    const result = await redeemResetLink(token, newPassword);
+    if (!result) return invalidResetLink(res);
+    if (result.setupEmployeeId) {
+      return res.json(formatResponse(true, 'Password created. Sign in to open your team.', result));
+    }
     return res.json(formatResponse(true, 'Password updated. Sign in with your new password.'));
   } catch (error) {
     console.error('Password reset failed:', error.message);

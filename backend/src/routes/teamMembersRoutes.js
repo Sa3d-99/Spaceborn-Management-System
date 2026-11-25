@@ -184,6 +184,19 @@ router.get('/employees/:id', protect, async (req, res) => {
   }
 });
 
+router.get('/team-members/mine', protect, async (req, res) => {
+  const department = req.user.department;
+  const employees = department
+    ? await User.find({ department, isActive: true, signupDepartment: { $exists: false } }).select('-password')
+    : [];
+  const members = employees.map(employee => ({
+    id: employee._id,
+    name: getUserName(employee),
+    role: employee.role
+  }));
+  res.json({ success: true, data: { department, members } });
+});
+
 // GET /api/team-members?department=...
 router.get('/team-members', protect, async (req, res) => {
   try {
