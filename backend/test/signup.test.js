@@ -205,3 +205,29 @@ test('concurrent requests for the same email produce one pending signup and one 
   assert.equal(pending.body.data.filter(entry => entry.email === applicant.email).length, 1);
   assert.equal(emails.filter(matches).length, 1);
 });
+
+test('signup reaches the CEO queue without Resend and can notify the CEO after configuration', async t => {
+  const applicant = { name: 'Queued Applicant', email: 'queued@example.test', department: 'Sensor Stack' };
+  const resendKey = process.env.RESEND_API_KEY;
+  t.after(() => { process.env.RESEND_API_KEY = resendKey; });
+  delete process.env.RESEND_API_KEY;
+
+  const submission = await request('/signup', { body: applicant });
+  assert.equal(submission.status, 202);
+  const pending = await request('/signup-requests', { token: ceoToken });
+  const queued = pending.body.data.find(entry => entry.email === applicant.email);
+  assert.equal(queued?.status, 'pending');
+  assert.equal(await User.findOne({ email: applicant.email }), null);
+  const matches = message =>
+    recipientMatches(message, process.env.SIGNUP_ADMIN_EMAIL) && message.text.includes(applicant.email);
+  assert.ok(!emails.some(matches));
+
+  process.env.RESEND_API_KEY = resendKey;
+  const retry = await request('/signup', { body: applicant });
+  assert.deepEqual(retry, submission);
+  await waitForEmail(matches);
+  const reviewedQueue = await request('/signup-requests', { token: ceoToken });
+  const entries = reviewedQueue.body.data.filter(entry => entry.email === applicant.email);
+  assert.deepEqual(entries.map(entry => entry.id), [queued.id]);
+  assert.equal(emails.filter(matches).length, 1);
+});

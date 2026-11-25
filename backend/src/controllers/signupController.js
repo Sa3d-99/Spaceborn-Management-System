@@ -40,19 +40,19 @@ exports.signup = async (req, res) => {
   }
   const settings = emailSettings();
   const admin = settings && await adminEmail();
-  if (!admin) return res.status(503).json(formatResponse(false, 'Signup is unavailable. Contact your CRM administrator.'));
 
   const { rows: [request] } = await query(`
     INSERT INTO signup_requests (id, email, full_name, department, last_notification_attempt)
-    SELECT $1, $2, $3, $4, NOW()
+    SELECT $1, $2, $3, $4, CASE WHEN $5::boolean THEN NOW() END
     WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(data->>'email') = $2)
     ON CONFLICT (email) DO UPDATE SET last_notification_attempt = NOW()
-    WHERE signup_requests.status = 'pending' AND signup_requests.admin_notified_at IS NULL
-      AND signup_requests.last_notification_attempt < NOW() - INTERVAL '60 seconds'
+    WHERE $5::boolean AND signup_requests.status = 'pending' AND signup_requests.admin_notified_at IS NULL
+      AND (signup_requests.last_notification_attempt IS NULL
+           OR signup_requests.last_notification_attempt < NOW() - INTERVAL '60 seconds')
     RETURNING id, email, full_name, department
-  `, [randomBytes(12).toString('hex'), address, fullName, department]);
+  `, [randomBytes(12).toString('hex'), address, fullName, department, Boolean(admin)]);
 
-  if (request) {
+  if (request && admin) {
     try {
       await sendEmail(settings, {
         to: admin,
