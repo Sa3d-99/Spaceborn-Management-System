@@ -142,12 +142,12 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
             <div className="flex flex-wrap items-center gap-3">
               <label className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer">
                 {file ? 'Choose another file' : 'Choose file'}
-                <input type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFile} />
+                <input type="file" accept=".xlsx,.xls,.csv" className="file-input hidden" onChange={handleFile} />
               </label>
               {file && <span className="text-sm text-gray-700">{file.name} · {rows.length} rows</span>}
               {sheetNames.length > 1 && (
                 <select value={sheet} onChange={(e) => loadSheet(buffer, e.target.value)}
-                  className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                  className="select px-3 py-2 border border-gray-300 rounded-lg text-sm">
                   {sheetNames.map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
               )}
@@ -208,7 +208,7 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
 
               {[...view.created, ...view.updated].length > 0 && (
                 <div className="border rounded-lg overflow-x-auto">
-                  <table className="w-full text-sm">
+                  <table className="table w-full text-sm">
                     <thead className="bg-gray-50 text-xs text-gray-500 uppercase">
                       <tr>
                         <th className="text-left px-4 py-2">Row</th>
@@ -250,7 +250,7 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
                   <span>
                     {result.credentials.length} new employees have temporary passwords. Download them now — they can't be shown again.
                   </span>
-                  <button onClick={downloadCredentials} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                  <button onClick={downloadCredentials} className="btn btn-sm btn-ghost px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                     Download login credentials
                   </button>
                 </div>
@@ -268,13 +268,13 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
             </label>
           ) : <span />}
           <div className="flex gap-2">
-            <button onClick={onClose} className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+            <button onClick={onClose} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
               {result ? 'Done' : 'Cancel'}
             </button>
             {!result && (
               <button onClick={handleImport}
                 disabled={busy || !preview || (preview.summary.toCreate + preview.summary.toUpdate) === 0}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
+                className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 disabled:cursor-not-allowed">
                 Import {preview ? preview.summary.toCreate + preview.summary.toUpdate : ''} employees
               </button>
             )}

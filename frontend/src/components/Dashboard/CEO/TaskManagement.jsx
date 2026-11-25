@@ -1,3 +1,7 @@
+import TaskActions from '../../Common/TaskActions';
+import { businessDate } from '../../../utils/timeZone';
+import { Plus as IconPlus } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/TaskManagement.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -242,7 +246,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
       fetchTasks();
     } catch (err) {
       console.error('Error creating task:', err);
-      alert('Failed to create task');
+      alert(err.message || 'Failed to create task');
     }
   };
 
@@ -262,7 +266,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'short', day: 'numeric' });
   };
 
   const assigneeNames = [...new Set(employees.map(e => e.name).filter(Boolean))];
@@ -309,13 +313,13 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
               placeholder="Search tasks..."
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           <select
             value={filterPriority}
             onChange={(e) => setFilterPriority(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Priorities</option>
             <option value="high">High</option>
@@ -325,7 +329,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
           <select
             value={filterAssignee}
             onChange={(e) => setFilterAssignee(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Assignees</option>
             {assigneeNames.map(name => (
@@ -334,11 +338,9 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
           </select>
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <IconPlus className="w-5 h-5" />
             <span>New Task</span>
           </button>
         </div>
@@ -348,7 +350,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Tasks</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchTasks} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
+          <button onClick={fetchTasks} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -459,8 +461,13 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
               </div>
             </div>
 
-            <div className="flex justify-end mt-6 pt-4 border-t">
-              <button onClick={() => setShowTaskModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Close</button>
+            <div className="flex flex-wrap justify-between gap-3 mt-6 pt-4 border-t">
+              <TaskActions task={selectedTask} employees={employees} canMoveDepartment onChanged={async () => {
+                setShowTaskModal(false);
+                setSelectedTask(null);
+                await fetchTasks();
+              }} />
+              <button onClick={() => setShowTaskModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Close</button>
             </div>
           </div>
         </div>
@@ -484,7 +491,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.title}
                   onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter task title"
                 />
               </div>
@@ -495,7 +502,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
                   rows="3"
                   value={formData.description}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Task description"
                 />
               </div>
@@ -506,7 +513,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
                   <select
                     value={formData.priority}
                     onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="high">High</option>
                     <option value="medium">Medium</option>
@@ -526,7 +533,7 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
                         department: emp?.department || formData.department,
                       });
                     }}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   >
                     <option value="">Select Assignee</option>
                     {employees.map(emp => (
@@ -542,15 +549,16 @@ const TaskManagement = ({ userRole = 'CEO' }) => {
                 <label className="block text-sm font-medium text-gray-700 mb-1">Due Date</label>
                 <input
                   type="date"
+                      min={businessDate()}
                   value={formData.dueDate}
                   onChange={(e) => setFormData({ ...formData, dueDate: e.target.value })}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Task</button>
+                <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Create Task</button>
               </div>
             </form>
           </div>

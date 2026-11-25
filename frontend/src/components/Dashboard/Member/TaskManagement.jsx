@@ -1,3 +1,5 @@
+import { Check as IconCheck } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Member/TaskManagement.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -247,7 +249,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   const formatRelativeDate = (dateString) => {
@@ -362,14 +364,14 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                           setProgress(task.progress);
                           setActiveTab('dailyLog');
                         }}
-                        className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
+                        className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition"
                       >
                         Update progress
                       </button>
                       {task.status !== 'Completed' && (
                         <button
                           onClick={() => markTaskComplete(getTaskId(task))}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                          className="btn btn-sm btn-ghost px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                         >
                           Mark done
                         </button>
@@ -411,7 +413,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                     const task = myTasks.find(t => String(getTaskId(t)) === e.target.value);
                     if (task) setProgress(task.progress);
                   }}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">Select a task</option>
@@ -430,7 +432,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                     max="100"
                     value={progress}
                     onChange={(e) => setProgress(parseInt(e.target.value))}
-                    className="flex-1"
+                    className="range flex-1"
                   />
                   <span className="text-sm font-medium min-w-[45px]">{progress}%</span>
                 </div>
@@ -443,13 +445,13 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                   placeholder="Share your progress, challenges, or blockers..."
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="textarea w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
 
               <button
                 onClick={handleSubmitDailyLog}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
               >
                 Submit Daily Update
               </button>
@@ -494,9 +496,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                 <div key={getTaskId(task)} className="px-6 py-4 flex items-center justify-between hover:bg-gray-50 transition">
                   <div className="flex items-center space-x-3">
                     <div className="w-5 h-5 bg-green-500 rounded-full flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
+                      <IconCheck className="w-3 h-3 text-white" />
                     </div>
                     <div>
                       <p className="font-medium text-gray-900">{task.title}</p>

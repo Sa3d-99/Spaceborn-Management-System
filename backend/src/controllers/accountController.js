@@ -1,3 +1,4 @@
+const { businessDate } = require('../utils/businessTime');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 
@@ -73,7 +74,7 @@ exports.getAccountStats = async (req, res) => {
     const totalUsers = await User.countDocuments();
     const roleCounts = await User.aggregate([{ $group: { _id: '$role', count: { $sum: 1 } } }]);
     const roleStats = {}; roleCounts.forEach(r => { roleStats[r._id] = r.count; });
-    const thisMonth = new Date().toISOString().slice(0, 7);
+    const thisMonth = businessDate().slice(0, 7);
     const createdThisMonth = await User.countDocuments({ createdAt: { $regex: `^${thisMonth}` } });
     res.status(200).json(formatResponse(true, 'Stats fetched successfully', { totalCreated: totalUsers, thisMonth: createdThisMonth, byRole: roleStats }));
   } catch (error) { res.status(500).json(formatResponse(false, error.message)); }

@@ -1,3 +1,4 @@
+import { displayDate, displayDateTime, displayTime } from '../../utils/timeZone';
 // src/components/Dashboard/Common/TeamReports.jsx
 import React, { useState, useEffect } from 'react';
 import reportService from '../../../services/reportService';
@@ -177,7 +178,7 @@ const TeamReports = ({ userRole, department, user }) => {
                 <select
                   value={filterDepartment}
                   onChange={(e) => setFilterDepartment(e.target.value)}
-                  className="px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
+                  className="select px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
                 >
                   <option value="all" className="text-black">All Departments</option>
                   {departments.map(dept => (
@@ -200,7 +201,7 @@ const TeamReports = ({ userRole, department, user }) => {
                 <div key={date} className="p-5">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-lg">
-                      {new Date(date).toLocaleDateString('en-US', { 
+                      {displayDate(date, 'en-US', {
                         weekday: 'long', 
                         year: 'numeric', 
                         month: 'long', 
@@ -230,7 +231,7 @@ const TeamReports = ({ userRole, department, user }) => {
                             </p>
                           </div>
                           <span className="text-xs text-gray-400">
-                            Submitted: {new Date(report.submittedAt).toLocaleTimeString()}
+                            Submitted: {displayTime(report.submittedAt)}
                           </span>
                         </div>
                         <div className="space-y-2 text-sm">
@@ -328,15 +329,15 @@ const TeamReports = ({ userRole, department, user }) => {
                           </div>
                         </div>
                         <div className="grid grid-cols-2 gap-2 text-sm text-gray-600 mb-2">
-                          <div>📅 From: {new Date(request.startDate).toLocaleDateString()}</div>
-                          <div>📅 To: {new Date(request.endDate).toLocaleDateString()}</div>
+                          <div>📅 From: {displayDate(request.startDate)}</div>
+                          <div>📅 To: {displayDate(request.endDate)}</div>
                         </div>
                         <div className="bg-gray-50 rounded-lg p-3">
                           <p className="text-sm text-gray-700">
                             <span className="font-medium">Reason:</span> {request.reason}
                           </p>
                           <p className="text-xs text-gray-400 mt-1">
-                            Applied on: {new Date(request.appliedOn).toLocaleString()}
+                            Applied on: {displayDateTime(request.appliedOn)}
                           </p>
                         </div>
                       </div>
@@ -346,7 +347,7 @@ const TeamReports = ({ userRole, department, user }) => {
                             const comments = prompt('Optional comments for approval:', 'Approved');
                             handleApproveLeave(request.id, comments);
                           }}
-                          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
+                          className="btn btn-sm btn-ghost px-4 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 transition-colors"
                         >
                           ✓ Approve
                         </button>
@@ -355,7 +356,7 @@ const TeamReports = ({ userRole, department, user }) => {
                             const comments = prompt('Reason for rejection:');
                             if (comments) handleRejectLeave(request.id, comments);
                           }}
-                          className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
+                          className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700 transition-colors"
                         >
                           ✗ Reject
                         </button>
@@ -398,7 +399,7 @@ const TeamReports = ({ userRole, department, user }) => {
                           </span>
                         </div>
                         <div className="mt-2 text-sm text-gray-600">
-                          <div>{new Date(request.startDate).toLocaleDateString()} → {new Date(request.endDate).toLocaleDateString()}</div>
+                          <div>{displayDate(request.startDate)} → {displayDate(request.endDate)}</div>
                           <div className="mt-1">Reason: {request.reason}</div>
                           {request.comments && (
                             <div className="mt-1 text-gray-500">Comments: {request.comments}</div>
@@ -406,7 +407,7 @@ const TeamReports = ({ userRole, department, user }) => {
                           {request.approvedBy && (
                             <div className="mt-1 text-xs text-gray-400">
                               {request.status === 'Approved' ? 'Approved' : 'Rejected'} by: {request.approvedBy}
-                              {request.approvedOn && ` on ${new Date(request.approvedOn).toLocaleString()}`}
+                              {request.approvedOn && ` on ${displayDateTime(request.approvedOn)}`}
                             </div>
                           )}
                         </div>

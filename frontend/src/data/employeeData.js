@@ -1,3 +1,4 @@
+import { businessDate } from '../utils/timeZone';
 // src/data/employeeData.js
 
 // Google Drive folder IDs for different document types
@@ -417,28 +418,28 @@ export const updateEmployeeDocument = (employeeId, documentType, fileId, fileNam
     case 'profilePhoto':
       employee.profilePhoto = {
         fileId, fileName, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0]
+        uploaded: businessDate()
       };
       break;
     case 'aadhaar':
       employee.aadhaar = {
         ...employee.aadhaar,
         fileId, fileName, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0]
+        uploaded: businessDate()
       };
       break;
     case 'pan':
       employee.pan = {
         ...employee.pan,
         fileId, fileName, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0]
+        uploaded: businessDate()
       };
       break;
     case 'resume':
       employee.resume = {
         ...employee.resume,
         fileId, fileName, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0],
+        uploaded: businessDate(),
         version: (employee.resume?.version || 0) + 1
       };
       break;
@@ -465,7 +466,7 @@ export const updateEmployeeDocument = (employeeId, documentType, fileId, fileNam
         name: fileName,
         fileName: fileName,
         fileId, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0],
+        uploaded: businessDate(),
         status: 'completed'
       });
       break;
@@ -473,14 +474,14 @@ export const updateEmployeeDocument = (employeeId, documentType, fileId, fileNam
       employee.education.documents.push({
         name: fileName,
         fileId, fileUrl: driveFileUrl, viewUrl: driveViewUrl,
-        uploaded: new Date().toISOString().split('T')[0]
+        uploaded: businessDate()
       });
       break;
     default:
       return null;
   }
 
-  employee.updatedAt = new Date().toISOString().split('T')[0];
+  employee.updatedAt = businessDate();
   return employee;
 };
 
@@ -505,7 +506,7 @@ const generateRandomPassword = () => {
 // Add new employee
 export const addEmployee = (employeeData) => {
   const newId = generateEmployeeId();
-  const now = new Date().toISOString().split('T')[0];
+  const now = businessDate();
   
   const newEmployee = {
     id: newId,
@@ -545,7 +546,7 @@ export const updateEmployee = (id, updateData) => {
     employeeMasterData[id] = {
       ...employeeMasterData[id],
       ...updateData,
-      updatedAt: new Date().toISOString().split('T')[0],
+      updatedAt: businessDate(),
       updatedBy: 'MGR001'
     };
     return employeeMasterData[id];
@@ -557,7 +558,7 @@ export const updateEmployee = (id, updateData) => {
 export const deleteEmployee = (id) => {
   if (employeeMasterData[id]) {
     employeeMasterData[id].employmentStatus = 'terminated';
-    employeeMasterData[id].updatedAt = new Date().toISOString().split('T')[0];
+    employeeMasterData[id].updatedAt = businessDate();
     return true;
   }
   return false;
@@ -604,7 +605,7 @@ export const resetEmployeePassword = (id) => {
     employeeMasterData[id].credentials.password = newPassword;
     employeeMasterData[id].credentials.tempPassword = true;
     employeeMasterData[id].credentials.forceReset = true;
-    employeeMasterData[id].updatedAt = new Date().toISOString().split('T')[0];
+    employeeMasterData[id].updatedAt = businessDate();
     return newPassword;
   }
   return null;

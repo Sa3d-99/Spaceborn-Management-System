@@ -1,3 +1,4 @@
+import { businessDate, displayDate, displayDateTime, displayTime } from '../../utils/timeZone';
 import React, { useState, useEffect } from 'react';
 import reportService from '../../services/reportService';
 
@@ -92,7 +93,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
         userRole: user.role,
         department: user.department,
         employeeId: user.employeeId,
-        date: new Date().toISOString().split('T')[0],
+        date: businessDate(),
         completedTasks: formData.completedTasks,
         ongoingWork: formData.ongoingWork,
         issuesFaced: formData.issuesFaced,
@@ -230,7 +231,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
             <div className="flex space-x-3">
               <button
                 onClick={() => setShowHistory(!showHistory)}
-                className="px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors text-sm"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-white/10 text-white rounded-lg hover:bg-white/20 transition-colors text-sm"
               >
                 {showHistory ? 'Hide History' : 'View History'}
               </button>
@@ -256,15 +257,15 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
       <div className="flex justify-between items-center flex-wrap gap-3">
         <div>
           <span className="text-green-800 font-semibold">✓ Report submitted for today</span>
-          <p className="text-green-600 text-sm">Submitted at: {todayReport?.submittedAt ? new Date(todayReport.submittedAt).toLocaleTimeString() : 'N/A'}</p>
+          <p className="text-green-600 text-sm">Submitted at: {todayReport?.submittedAt ? displayTime(todayReport.submittedAt) : 'N/A'}</p>
           {todayReport?.updatedAt && (
-            <p className="text-green-600 text-sm">Last updated: {new Date(todayReport.updatedAt).toLocaleTimeString()}</p>
+            <p className="text-green-600 text-sm">Last updated: {displayTime(todayReport.updatedAt)}</p>
           )}
         </div>
         <div className="flex gap-2">
           <button
             onClick={() => setIsEditing(true)}
-            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800"
           >
             Edit Report
           </button>
@@ -278,7 +279,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 nextDayPlan: '',
               });
             }}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             + New Report
           </button>
@@ -302,7 +303,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 value={formData.completedTasks}
                 onChange={(e) => setFormData({...formData, completedTasks: e.target.value})}
                 rows="4"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 placeholder="• Task 1: Completed feature X&#10;• Task 2: Fixed bug Y&#10;• Task 3: Attended meeting Z"
                 required
               />
@@ -317,7 +318,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 value={formData.ongoingWork}
                 onChange={(e) => setFormData({...formData, ongoingWork: e.target.value})}
                 rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 placeholder="• Currently working on feature A&#10;• Reviewing PR #123&#10;• Investigating performance issue"
               />
             </div>
@@ -330,7 +331,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 value={formData.issuesFaced}
                 onChange={(e) => setFormData({...formData, issuesFaced: e.target.value})}
                 rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 placeholder="• Dependency delay from team X&#10;• Technical challenge with Y&#10;• Need clarification on requirement Z"
               />
             </div>
@@ -343,7 +344,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 value={formData.nextDayPlan}
                 onChange={(e) => setFormData({...formData, nextDayPlan: e.target.value})}
                 rows="3"
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 placeholder="• Complete feature A&#10;• Start task B&#10;• Team meeting at 2 PM"
               />
             </div>
@@ -363,7 +364,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                       });
                     }
                   }}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
@@ -372,7 +373,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 type={isEditing ? 'button' : 'submit'}
                 onClick={isEditing ? handleUpdate : undefined}
                 disabled={isSubmitting}
-                className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
+                className="btn btn-sm btn-ghost px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors disabled:opacity-50"
               >
                 {isSubmitting ? 'Saving...' : isEditing ? 'Update Report' : 'Submit Report'}
               </button>
@@ -402,7 +403,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                     <div className="flex-1">
                       <div className="flex items-center space-x-2 flex-wrap gap-2">
                         <span className="font-medium text-gray-900">
-                          {new Date(report.date).toLocaleDateString('en-US', { 
+                          {displayDate(report.date, 'en-US', {
                             weekday: 'long', 
                             year: 'numeric', 
                             month: 'long', 
@@ -419,13 +420,13 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                         )}
                       </div>
                       <p className="text-xs text-gray-400 mt-1">
-                        Submitted: {new Date(report.submittedAt).toLocaleString()}
-                        {report.updatedAt && ` • Updated: ${new Date(report.updatedAt).toLocaleString()}`}
+                        Submitted: {displayDateTime(report.submittedAt)}
+                        {report.updatedAt && ` • Updated: ${displayDateTime(report.updatedAt)}`}
                       </p>
                     </div>
                     <button
                       onClick={() => handleDeleteReport(report)}
-                      className="text-red-500 hover:text-red-700 text-sm px-2 py-1"
+                      className="btn btn-sm btn-ghost text-red-500 hover:text-red-700 text-sm px-2 py-1"
                       title="Delete report"
                     >
                       🗑️

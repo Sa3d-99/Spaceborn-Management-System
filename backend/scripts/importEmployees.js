@@ -9,7 +9,7 @@
 // Uses DATABASE_URL if set (Render/Supabase), otherwise the local PGlite database.
 // New employees get a random temporary password; these are written to
 // employee-credentials-<timestamp>.csv next to the input file. Share them privately, then delete the file.
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+require('../src/config/env');
 const path = require('path');
 const fs = require('fs');
 

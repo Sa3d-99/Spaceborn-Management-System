@@ -1,3 +1,5 @@
+import { Clock as IconClock, Download as IconDownload, Search as IconSearch, X as IconX } from '../../Common/Icons';
+import { displayDate, displayDateTime, displayTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/TeamReports.jsx
 import React, { useState, useEffect } from 'react';
 import reportService from '../../../services/reportService';
@@ -272,7 +274,7 @@ Version: ${roadmap.version}
 Status: ${roadmap.status.toUpperCase()}
 Department: ${roadmap.department}
 Lead: ${roadmap.sharedBy?.name || 'Team Lead'} (${roadmap.sharedBy?.role || 'Team Lead'})
-Issued On: ${new Date(roadmap.sharedAt).toLocaleString()}
+Issued On: ${displayDateTime(roadmap.sharedAt)}
 
 DESCRIPTION
 -----------
@@ -280,15 +282,15 @@ ${roadmap.description}
 
 TIMELINE
 --------
-Start Date: ${new Date(roadmap.startDate).toLocaleDateString()}
-Target Date: ${new Date(roadmap.targetDate).toLocaleDateString()}
+Start Date: ${displayDate(roadmap.startDate)}
+Target Date: ${displayDate(roadmap.targetDate)}
 Overall Progress: ${roadmap.overallProgress}%
-Last Updated: ${new Date(roadmap.lastUpdated).toLocaleDateString()}
+Last Updated: ${displayDate(roadmap.lastUpdated)}
 
 MILESTONES
 ----------
 ${roadmap.milestones.map(m => `✓ ${m.title}
-   Due: ${new Date(m.dueDate).toLocaleDateString()}
+   Due: ${displayDate(m.dueDate)}
    Status: ${m.status}
    Progress: ${m.progress}%
    Description: ${m.description}
@@ -299,8 +301,8 @@ FEATURES
 ${roadmap.features.map(f => `• ${f.name}
    Priority: ${f.priority.toUpperCase()}
    Status: ${f.status}
-   ${f.completionDate ? `Completed: ${new Date(f.completionDate).toLocaleDateString()}` : ''}
-   ${f.expectedCompletion ? `Expected: ${new Date(f.expectedCompletion).toLocaleDateString()}` : ''}
+   ${f.completionDate ? `Completed: ${displayDate(f.completionDate)}` : ''}
+   ${f.expectedCompletion ? `Expected: ${displayDate(f.expectedCompletion)}` : ''}
 `).join('\n')}
 
 RISKS & MITIGATION
@@ -312,7 +314,7 @@ ${roadmap.risks.map(r => `⚠ ${r.description}
    Owner: ${r.owner || 'Not assigned'}
 `).join('\n')}
 
-Report Generated: ${new Date().toLocaleString()}
+Report Generated: ${displayDateTime(new Date())}
     `;
     
     const blob = new Blob([content], { type: 'text/plain' });
@@ -516,7 +518,7 @@ Report Generated: ${new Date().toLocaleString()}
                 <select
                   value={selectedMember}
                   onChange={(e) => setSelectedMember(e.target.value)}
-                  className="px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
+                  className="select px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
                 >
                   <option value="all" className="text-black">All Members</option>
                   {teamMembers.map(member => (
@@ -527,13 +529,13 @@ Report Generated: ${new Date().toLocaleString()}
                   type="date"
                   value={dateFilter}
                   onChange={(e) => setDateFilter(e.target.value)}
-                  className="px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
+                  className="input px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
                   placeholder="Filter by date"
                 />
                 {dateFilter && (
                   <button
                     onClick={() => setDateFilter('')}
-                    className="px-3 py-1 bg-red-500/20 text-red-300 rounded-lg text-sm hover:bg-red-500/30"
+                    className="btn btn-sm btn-ghost px-3 py-1 bg-red-500/20 text-red-300 rounded-lg text-sm hover:bg-red-500/30"
                   >
                     Clear
                   </button>
@@ -554,7 +556,7 @@ Report Generated: ${new Date().toLocaleString()}
                 <div key={date} className="p-6">
                   <div className="flex items-center justify-between mb-4">
                     <h3 className="font-semibold text-lg text-gray-900">
-                      {new Date(date).toLocaleDateString('en-US', { 
+                      {displayDate(date, 'en-US', {
                         weekday: 'long', 
                         year: 'numeric', 
                         month: 'long', 
@@ -584,7 +586,7 @@ Report Generated: ${new Date().toLocaleString()}
                             </div>
                           </div>
                           <span className="text-xs text-gray-400">
-                            {new Date(report.submittedAt).toLocaleTimeString()}
+                            {displayTime(report.submittedAt)}
                           </span>
                         </div>
                         
@@ -649,11 +651,9 @@ Report Generated: ${new Date().toLocaleString()}
                 placeholder="Search roadmaps by title or lead..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                className="input w-full px-4 py-2 pl-10 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
               />
-              <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <IconSearch className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             </div>
           </div>
 
@@ -689,7 +689,7 @@ Report Generated: ${new Date().toLocaleString()}
                           setSelectedRoadmap(roadmap);
                           setShowModal(true);
                         }}
-                        className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+                        className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
                       >
                         View Details
                       </button>
@@ -698,9 +698,7 @@ Report Generated: ${new Date().toLocaleString()}
                         className="p-2 text-gray-500 hover:text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
                         title="Download Roadmap"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                        </svg>
+                        <IconDownload className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -718,10 +716,8 @@ Report Generated: ${new Date().toLocaleString()}
                         </div>
                       </div>
                       <div className="flex items-center space-x-2">
-                        <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                        </svg>
-                        <span className="text-sm text-gray-600">Issued: {new Date(roadmap.sharedAt).toLocaleDateString()}</span>
+                        <IconClock className="w-4 h-4 text-purple-600" />
+                        <span className="text-sm text-gray-600">Issued: {displayDate(roadmap.sharedAt)}</span>
                       </div>
                     </div>
                     <div className="flex items-center space-x-4">
@@ -764,12 +760,12 @@ Report Generated: ${new Date().toLocaleString()}
                     <div className="flex items-center justify-between text-sm text-gray-600">
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">Start:</span>
-                        <span>{new Date(roadmap.startDate).toLocaleDateString()}</span>
+                        <span>{displayDate(roadmap.startDate)}</span>
                       </div>
                       <div className="flex-1 mx-4 h-px bg-gray-200"></div>
                       <div className="flex items-center space-x-2">
                         <span className="font-medium">Target:</span>
-                        <span>{new Date(roadmap.targetDate).toLocaleDateString()}</span>
+                        <span>{displayDate(roadmap.targetDate)}</span>
                       </div>
                     </div>
                   </div>
@@ -793,16 +789,14 @@ Report Generated: ${new Date().toLocaleString()}
                   <span className="text-gray-300">|</span>
                   <p className="text-sm text-gray-500">Issued by {selectedRoadmap.sharedBy?.name || 'Team Lead'}</p>
                   <span className="text-gray-300">|</span>
-                  <p className="text-sm text-gray-500">{new Date(selectedRoadmap.sharedAt).toLocaleDateString()}</p>
+                  <p className="text-sm text-gray-500">{displayDate(selectedRoadmap.sharedAt)}</p>
                 </div>
               </div>
               <button
                 onClick={() => setShowModal(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <IconX className="w-6 h-6" />
               </button>
             </div>
 
@@ -830,9 +824,9 @@ Report Generated: ${new Date().toLocaleString()}
                   <div>
                     <p className="text-sm text-gray-500 mb-1">Timeline Status</p>
                     <div className="flex items-center justify-between text-sm">
-                      <span>Start: {new Date(selectedRoadmap.startDate).toLocaleDateString()}</span>
+                      <span>Start: {displayDate(selectedRoadmap.startDate)}</span>
                       <span className="text-gray-400">→</span>
-                      <span>Target: {new Date(selectedRoadmap.targetDate).toLocaleDateString()}</span>
+                      <span>Target: {displayDate(selectedRoadmap.targetDate)}</span>
                     </div>
                   </div>
                 </div>
@@ -852,7 +846,7 @@ Report Generated: ${new Date().toLocaleString()}
                       </div>
                       <p className="text-sm text-gray-600 mb-2">{milestone.description}</p>
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-gray-500">Due: {new Date(milestone.dueDate).toLocaleDateString()}</span>
+                        <span className="text-gray-500">Due: {displayDate(milestone.dueDate)}</span>
                         <div className="flex items-center space-x-2">
                           <span className="text-gray-500">Progress:</span>
                           <div className="w-24 h-1.5 bg-gray-200 rounded-full overflow-hidden">
@@ -875,8 +869,8 @@ Report Generated: ${new Date().toLocaleString()}
                       <div>
                         <p className="font-medium text-gray-900">{feature.name}</p>
                         <p className="text-xs text-gray-500 mt-0.5">
-                          {feature.status === 'completed' ? `Completed: ${new Date(feature.completionDate).toLocaleDateString()}` : 
-                           feature.expectedCompletion ? `Expected: ${new Date(feature.expectedCompletion).toLocaleDateString()}` : ''}
+                          {feature.status === 'completed' ? `Completed: ${displayDate(feature.completionDate)}` :
+                           feature.expectedCompletion ? `Expected: ${displayDate(feature.expectedCompletion)}` : ''}
                         </p>
                       </div>
                       <div className="flex items-center space-x-2">
@@ -926,7 +920,7 @@ Report Generated: ${new Date().toLocaleString()}
                         </div>
                         <button
                           onClick={() => downloadAttachment(selectedRoadmap, attachment)}
-                          className="shrink-0 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
+                          className="btn btn-sm btn-ghost shrink-0 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
                         >
                           Download
                         </button>
@@ -946,7 +940,7 @@ Report Generated: ${new Date().toLocaleString()}
                     {selectedRoadmap.weeklyUpdates.map((update, idx) => (
                       <div key={idx} className="border border-gray-200 rounded-xl p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h4 className="font-medium text-gray-900">Week {update.week} - {new Date(update.date).toLocaleDateString()}</h4>
+                          <h4 className="font-medium text-gray-900">Week {update.week} - {displayDate(update.date)}</h4>
                           <div className="flex items-center space-x-2">
                             <span className="text-sm text-gray-500">Progress:</span>
                             <span className="font-semibold text-purple-600">{update.progress}%</span>
@@ -969,11 +963,9 @@ Report Generated: ${new Date().toLocaleString()}
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
               <button
                 onClick={() => downloadRoadmap(selectedRoadmap)}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
               >
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                </svg>
+                <IconDownload className="w-4 h-4" />
                 <span>Download Full Report</span>
               </button>
             </div>

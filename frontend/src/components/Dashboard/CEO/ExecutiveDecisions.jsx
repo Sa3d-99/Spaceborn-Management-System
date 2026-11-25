@@ -1,6 +1,7 @@
+import { displayDate, displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/ExecutiveDecisions.jsx
 import React, { useState, useEffect } from 'react';
-import { Target, Check, X, Clock, AlertCircle, ChevronRight } from 'lucide-react';
+import { Target, Check, X, Clock, AlertCircle, ChevronRight } from '../../Common/Icons';
 import authService from '../../../services/authService';
 
 const ExecutiveDecisions = ({ userRole = 'CEO' }) => {
@@ -253,12 +254,12 @@ const ExecutiveDecisions = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const formatDateTime = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleString();
+    return displayDateTime(dateString);
   };
 
   if (isLoading && decisions.length === 0) {
@@ -371,7 +372,7 @@ const ExecutiveDecisions = ({ userRole = 'CEO' }) => {
                         setSelectedDecision(decision);
                         setShowDetailsModal(true);
                       }}
-                      className="px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+                      className="btn btn-sm btn-ghost px-3 py-1 text-sm bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
                     >
                       Review
                     </button>
@@ -484,20 +485,20 @@ const ExecutiveDecisions = ({ userRole = 'CEO' }) => {
                   value={comment}
                   onChange={(e) => setComment(e.target.value)}
                   placeholder="Add any comments or notes..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
               <div className="flex justify-end space-x-3 pt-4 border-t">
                 <button
                   onClick={() => rejectDecision(selectedDecision.id)}
-                  className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
+                  className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition"
                 >
                   Reject
                 </button>
                 <button
                   onClick={() => approveDecision(selectedDecision.id)}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
+                  className="btn btn-sm btn-ghost px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition"
                 >
                   Approve
                 </button>

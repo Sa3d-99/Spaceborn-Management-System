@@ -2,11 +2,11 @@
 
 Internal operations and employee management portal for tracking daily tasks, attendance, leave requests, and team performance.
 
-## Logging In
+## Signing in and requesting an account
 
-Accounts are created from the team sheet (see **Importing Real Employees from Excel** below). Each person's Employee ID and temporary password are in the `employee-credentials-*.csv` file the import creates. Employee IDs look like `CEO001`, `DIR001`, `LD001`, `PM001`, `INT001`.
+Sign in with your registered email or employee ID. New members select **Request an account**. The CRM emails the administrator, who signs in as CEO and reviews the request under **Signup requests**. After approval, the applicant receives a single-use link to set a password and gets Intern access.
 
-The old demo accounts (CEO001 / admin123, etc.) only exist if the database is started with `SEED_DEMO_DATA=true` or `npm run seed` is run.
+For a local demo, start with `SEED_DEMO_DATA=true` and an empty database. The demo CEO email is `john.doe@spaceborn.com`, employee ID `CEO001`, and password `admin123`. Keep the demo bound to your local machine.
 
 ## Features
 
@@ -47,7 +47,7 @@ The old demo accounts (CEO001 / admin123, etc.) only exist if the database is st
 
 ## Running Locally
 
-Requires Node.js 18 or higher.
+Use Node.js 26 LTS and npm 12. The pinned Node release is in [.nvmrc](.nvmrc). The app uses Express 5, React 19, Vite 8, Tailwind CSS 4, DaisyUI 5, Font Awesome 7, and PostgreSQL 19.
 
 ### Run Production Build (Single Port)
 
@@ -94,9 +94,14 @@ This project can be deployed as a unified web service with a managed PostgreSQL 
 | :--- | :--- | :--- |
 | `PORT` | Web server port | `5000` |
 | `DATABASE_URL` | PostgreSQL connection string. If omitted, uses local embedded PGlite. | `""` |
-| `JWT_SECRET` | Secret key for signing auth tokens | `"spaceborn-secret-key"` |
+| `JWT_SECRET` | Secret key for signing auth tokens | Required in production and Docker |
 | `JWT_EXPIRE` | Auth token duration | `"24h"` |
 | `PG_POOL_MAX` | Maximum PostgreSQL connections opened by this service | `2` |
+| `APP_URL` | Public frontend origin used for links in email | Local Docker app URL |
+| `RESEND_API_KEY` | Server-side Resend sending key | |
+| `RESEND_FROM_EMAIL` | Sender address on a domain verified in Resend | |
+| `SIGNUP_ADMIN_EMAIL` | Inbox for signup review emails | First active CEO email |
+| `TRUST_PROXY_HOPS` | Number of trusted reverse-proxy hops for client-IP rate limits | `0` |
 
 The frontend can be hosted separately on Vercel. In that case, set the Vercel
 build environment variable `REACT_APP_API_URL` to the Render service URL ending
@@ -109,17 +114,50 @@ PostgreSQL client. Google Drive's SDK is loaded only when a Drive upload runs.
 
 Docker Compose runs the complete application: the React frontend and Express API are served together by the app container, with PostgreSQL in a separate container. Database files and uploaded attachments are kept in named volumes.
 
-1. Copy `.env.docker.example` to `.env` and set strong, unique values for `POSTGRES_PASSWORD` and `JWT_SECRET`.
-2. Start the application with `docker compose up --build -d`.
-3. Open `http://localhost:5000`. The API health endpoint is `http://localhost:5000/api/health`.
+Docker Compose, the local backend and its scripts, and Vite all read the root `.env`. From a fresh checkout, create that file from the project root with private permissions and unique secrets.
 
-Set `APP_PORT` in `.env` to change the host port. To stop the containers while preserving database and upload data, run `docker compose down`. To remove that data too, run `docker compose down --volumes`.
+```sh
+(
+  umask 077
+  set -C
+  cat > .env <<EOF
+APP_PORT=127.0.0.1:5000
+APP_URL=http://localhost:5000
+POSTGRES_PASSWORD=$(openssl rand -hex 24)
+JWT_SECRET=$(openssl rand -hex 32)
+SEED_DEMO_DATA=false
+RESEND_API_KEY=
+RESEND_FROM_EMAIL=
+SIGNUP_ADMIN_EMAIL=
+EOF
+)
+```
+
+Start the application with `./start.sh`. The launcher builds and starts Compose, waits for the app and database to be healthy, and prints the URL even when the services were already running. Leave the command running while you use the CRM. Press Ctrl+C in that terminal to stop the app and database.
+
+Keep server secrets in unprefixed variables such as `JWT_SECRET` and `RESEND_API_KEY`. Frontend settings use the `REACT_APP_` prefix and are visible to browser users. Docker passes the supported frontend settings to Vite at build time.
+
+Set `APP_PORT` and `APP_URL` in `.env` when changing the host port. Use `docker compose down` to remove the containers while keeping the database and uploads.
+
+For a local demo, set `APP_PORT=127.0.0.1:5000`, `APP_URL=http://localhost:5000`, and `SEED_DEMO_DATA=true` before the first start. Existing PostgreSQL 16 volumes and PGlite PG18 data require a logical migration. See the [database upgrade guide](docs/database-upgrade.md).
 
 ### Separate frontend and backend deployments
 
 When the React frontend is deployed separately (for example, on Vercel), set the frontend build environment variable `REACT_APP_API_URL` to the backend's public API base URL, including `/api` (for example, `https://your-api.example.com/api`). Set it in the frontend hosting project's production environment and redeploy; React embeds this value at build time. The backend must be reachable over HTTPS. You can check it at `<backend-origin>/api/health` before testing login.
 
 For a backend deployed on Vercel, set the Vercel project root directory to `backend` and configure `DATABASE_URL` to a reachable managed PostgreSQL database. Vercel functions do not provide persistent storage for the local PGlite database. Configure `JWT_SECRET` there as well.
+
+## Resend email
+
+Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `APP_URL` in the root `.env`. Use a public HTTPS frontend origin when recipients open links from another device. Set `SIGNUP_ADMIN_EMAIL` if the review inbox differs from the first active CEO account. Start Compose with `./start.sh` to apply the settings.
+
+`Spaceborn Accounts <onboarding@resend.dev>` can send test mail to the Resend account's email address. To reach employee inboxes, set `RESEND_FROM_EMAIL` to an address on a domain verified for sending and use a key with permission for that domain. [Resend 403 guidance](https://resend.com/changelog/improved-logs-visibility)
+
+**Forgot password** is available from sign-in and directly at `/forgot-password`. The Spaceborn email includes a **Reset Password** button and a plain-text fallback. The link expires after 30 minutes and can be used once. The reset page validates the link before showing the password form and offers a fresh request when the link is invalid, expired, or used. A successful reset revokes older sessions. New passwords accept 15–128 characters and passphrases.
+
+When the CEO approves a signup, Resend sends the applicant their employee ID and a **Create Password** button. The link opens the same password form and expires after 30 minutes. If delivery fails or the link expires, the CEO can select **Resend setup link** in **Signup requests**.
+
+For a Vercel-hosted frontend, set the API's `APP_URL` to the frontend's public HTTPS origin. Keep the Resend key and sender in the API environment, and build the frontend with `REACT_APP_API_URL` set to that API's HTTPS address ending in `/api`. The frontend's Vercel rewrite serves both recovery URLs directly. Keep click tracking disabled so reset links lead straight to the CRM. [Resend tracking settings](https://resend.com/blog/open-and-click-tracking)
 
 ## Importing Real Employees from Excel
 
@@ -140,11 +178,11 @@ The CLI writes `employee-credentials-<timestamp>.csv` next to the sheet (git-ign
 
 **Sheet format.** Only a name and an email column are required. Common headings are recognised automatically (`Employee Name`, `Official Email ID`, `Mobile No`, `Dept`, `Designation`, `Reporting Manager`, `Date of Joining`/`DOJ`, `DOB`, `Emp Code`, `Status`, …), title rows above the header are skipped, and unknown columns are kept under `additionalInfo`. Dates may be Excel dates, `DD/MM/YYYY` or `YYYY-MM-DD`; 10-digit phone numbers get a `+91` prefix.
 
-- **Role** column sets access. Spaceborn titles map to the app's permission levels: `CEO` → CEO, `Director` → COO (full access), `Team Lead` / `Co-Lead` → Team Lead, `Project Manager` → Manager (can add/remove people, approve leave), `HR` → HR, `Intern` → Member. The app shows the Spaceborn titles everywhere (see `frontend/src/utils/roleLabels.js`). Without a Role column everyone is imported as Intern.
+- **Role** column sets access. Spaceborn titles map to the app's permission levels. `CEO` → CEO, `Director` → COO, `Team Lead` → Team Lead, `Co-Lead` → CO Head, `Project Manager` → Manager, `HR` / `Coordinator` → HR, and `Intern` → Member. The app displays the Spaceborn titles. Without a Role column, the import can infer leadership from explicit designations and otherwise uses Intern.
 - **Employee ID** is optional; missing IDs are generated (`INT001`, `LD002`, `DIR001`, `PM001`, …) after the highest existing number.
 - Employees are matched by Employee ID, then email. Re-running the same sheet is safe: existing people are skipped unless `--update` / "Update employees that already exist" is chosen. Passwords are never changed by an update.
 - **Reporting Manager** (name, employee ID or email) is linked to that person's record when they exist in the system.
-- COO cannot import a CEO; Managers and HR cannot import CEO/COO.
+- Directors can import roles below Director. Project Managers and HR can import Interns.
 
 ### Starting fresh (removing the example data)
 
@@ -180,3 +218,7 @@ Spaceborn-Management-System/
 ```
 
 
+
+## Tests and project knowledge
+
+Run `npm test --prefix backend` and `npm test --prefix frontend` after installing dependencies. The [CRM knowledge base](docs/knowledge-base/crm.md) records workflows and outstanding decisions. The local Graphify outputs are in `graphify-out/`, with the Obsidian vault in `graphify-out/obsidian/`.

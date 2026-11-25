@@ -18,23 +18,9 @@ export async function updateEmployeeById(token, id, payload) {
 }
 
 export function randomPassword() {
-  const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-  const lower = 'abcdefghijklmnopqrstuvwxyz';
-  const numbers = '0123456789';
-  const special = '!@#$%^&*';
-  const getRandom = (str) => str[Math.floor(Math.random() * str.length)];
-
-  let password = '';
-  password += getRandom(upper);
-  password += getRandom(lower);
-  password += getRandom(numbers);
-  password += getRandom(special);
-
-  for (let i = 0; i < 8; i++) {
-    const all = lower + upper + numbers;
-    password += getRandom(all);
-  }
-  return password.split('').sort(() => Math.random() - 0.5).join('');
+  return Array.from(crypto.getRandomValues(new Uint8Array(16)), byte =>
+    byte.toString(16).padStart(2, '0')
+  ).join('');
 }
 
 export async function resetEmployeePassword(token, id, newPassword) {

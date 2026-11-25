@@ -1,3 +1,5 @@
+import { AlertTriangle as IconAlertTriangle } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Member/MemberDashboard.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -134,7 +136,7 @@ const MemberDashboard = () => {
     setMemberData({
       name: currentUser?.name || 'Ravi Das',
       role: currentUser?.role || 'Member',
-      title: `${currentUser?.department || 'Core Systems'} · Joined ${new Date().toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}`,
+      title: `${currentUser?.department || 'Core Systems'} · Joined ${displayDate(new Date(), 'en-US', { month: 'short', year: 'numeric' })}`,
       description: 'Frontend developer passionate about building clean, accessible interfaces. Currently focused on the authentication and dashboard modules.',
       myTasks: normalizeTaskList([
         {
@@ -219,15 +221,13 @@ const MemberDashboard = () => {
     return (
       <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
         <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-          </svg>
+          <IconAlertTriangle className="w-8 h-8 text-red-600" />
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Dashboard</h3>
         <p className="text-gray-600 mb-4">{error}</p>
         <button 
           onClick={fetchDashboardData}
-          className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
         >
           Try Again
         </button>
@@ -276,7 +276,7 @@ const MemberDashboard = () => {
                       </span>
                     </div>
                     <p className="text-sm text-gray-500 mt-1">
-                      Due {task.dueDate ? new Date(task.dueDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
+                      Due {task.dueDate ? displayDate(task.dueDate, 'en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : 'N/A'}
                     </p>
                   </div>
                   <div className="flex items-center space-x-4">

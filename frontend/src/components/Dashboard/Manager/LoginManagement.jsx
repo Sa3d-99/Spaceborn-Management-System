@@ -1,3 +1,5 @@
+import { RefreshCw as IconRefreshCw, Search as IconSearch } from '../../Common/Icons';
+import { displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/LoginManagement.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -125,7 +127,7 @@ const LoginManagement = ({ userRole }) => {
       // Add to history
       const logoutEntry = {
         ...selectedEmployee,
-        logoutTime: new Date().toLocaleString(),
+        logoutTime: displayDateTime(new Date()),
         status: 'forced'
       };
       setLoginHistory(prev => [logoutEntry, ...prev]);
@@ -182,7 +184,7 @@ const LoginManagement = ({ userRole }) => {
 
   const ActiveSessionsTable = () => (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="table w-full">
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
@@ -229,7 +231,7 @@ const LoginManagement = ({ userRole }) => {
 
   const LoginHistoryTable = () => (
     <div className="overflow-x-auto">
-      <table className="w-full">
+      <table className="table w-full">
         <thead className="bg-gray-50">
           <tr>
             <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
@@ -279,11 +281,9 @@ const LoginManagement = ({ userRole }) => {
         </div>
         <button
           onClick={fetchLoginData}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center space-x-2"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-          </svg>
+          <IconRefreshCw className="w-4 h-4" />
           <span>Refresh</span>
         </button>
       </div>
@@ -316,11 +316,9 @@ const LoginManagement = ({ userRole }) => {
             placeholder="Search by name, employee ID, or role..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-black pl-10"
+            className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:border-black pl-10"
           />
-          <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
+          <IconSearch className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
         </div>
       </div>
 
@@ -384,13 +382,13 @@ const LoginManagement = ({ userRole }) => {
             <div className="flex justify-end space-x-3">
               <button
                 onClick={() => setShowForceLogoutModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmForceLogout}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Force Logout
               </button>

@@ -1,5 +1,5 @@
 import React from 'react';
-import { MoreVertical } from 'lucide-react';
+import { MoreVertical } from './Icons';
 
 export const Card = ({ 
   title, 
@@ -11,13 +11,13 @@ export const Card = ({
 }) => {
   if (loading) {
     return (
-      <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden ${className}`}>
+      <div className={`card bg-base-100 border border-base-300 overflow-hidden ${className}`}>
         <div className="p-6">
-          <div className="animate-pulse space-y-4">
-            <div className="h-4 bg-gray-200 rounded w-1/4"></div>
+          <div className="space-y-4">
+            <div className="skeleton h-4 w-1/4"></div>
             <div className="space-y-3">
-              <div className="h-20 bg-gray-200 rounded"></div>
-              <div className="h-20 bg-gray-200 rounded"></div>
+              <div className="skeleton h-20"></div>
+              <div className="skeleton h-20"></div>
             </div>
           </div>
         </div>
@@ -26,7 +26,7 @@ export const Card = ({
   }
 
   return (
-    <div className={`bg-white rounded-xl border border-gray-200 overflow-hidden hover:shadow-lg transition-all duration-300 ${className}`}>
+    <div className={`card bg-base-100 border border-base-300 overflow-hidden hover:shadow-lg transition-all duration-300 ${className}`}>
       <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
         <div className="flex items-center space-x-2">
           {Icon && <Icon className="w-5 h-5 text-gray-500" />}
@@ -35,7 +35,7 @@ export const Card = ({
         {onMoreClick && (
           <button 
             onClick={onMoreClick}
-            className="text-gray-400 hover:text-gray-600 transition-colors"
+            className="btn btn-ghost btn-square btn-sm" type="button"
             aria-label="More options"
           >
             <MoreVertical className="w-4 h-4" />

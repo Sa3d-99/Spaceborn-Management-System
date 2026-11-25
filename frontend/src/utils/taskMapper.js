@@ -1,3 +1,4 @@
+import { businessDate } from './timeZone';
 // src/utils/taskMapper.js
 
 export const TASK_STATUSES = ['Pending', 'In progress', 'Completed', 'Overdue', 'Cancelled'];
@@ -131,13 +132,17 @@ export function getInitialsFromName(name) {
     .toUpperCase();
 }
 
+export function taskCalendarDate(value) {
+  if (!value) return '';
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value;
+  const instant = new Date(value);
+  return Number.isNaN(instant.getTime()) ? '' : businessDate(instant);
+}
+
 export function isTaskOverdue(task) {
   if (!task?.dueDate || task.status === 'Completed') return false;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const due = new Date(task.dueDate);
-  due.setHours(0, 0, 0, 0);
-  return due < today;
+  const due = taskCalendarDate(task.dueDate);
+  return Boolean(due && due < businessDate());
 }
 
 export function calculateTaskStats(tasks) {

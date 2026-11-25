@@ -1,3 +1,5 @@
+import { AlertTriangle as IconAlertTriangle, Calendar as IconCalendar, Plus as IconPlus, Trash2 as IconTrash2 } from '../../Common/Icons';
+import { displayDate, meetingTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/Meetings.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -297,7 +299,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     const options = { year: 'numeric', month: 'long', day: 'numeric' };
-    return new Date(dateString).toLocaleDateString(undefined, options);
+    return displayDate(dateString, undefined, options);
   };
 
   const canDeleteMeeting = () => {
@@ -322,11 +324,9 @@ const Meetings = ({ userRole = 'CEO' }) => {
         </div>
         <button
           onClick={() => setShowScheduleForm(!showScheduleForm)}
-          className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
         >
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <IconPlus className="w-5 h-5" />
           <span>{showScheduleForm ? 'Cancel' : 'Schedule Meeting'}</span>
         </button>
       </div>
@@ -349,7 +349,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   value={formData.title}
                   onChange={handleInputChange}
                   placeholder="e.g., Sprint Review"
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -359,7 +359,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   name="department"
                   value={formData.department}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 >
                   <option value="">Select department</option>
@@ -374,7 +374,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   name="duration"
                   value={formData.duration}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option>15 min</option>
                   <option>30 min</option>
@@ -391,18 +391,18 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   name="date"
                   value={formData.date}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">TIME *</label>
+                <label className="block text-sm font-medium text-gray-700 mb-1">Time (IST) *</label>
                 <input
                   type="time"
                   name="time"
                   value={formData.time}
                   onChange={handleInputChange}
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   required
                 />
               </div>
@@ -414,7 +414,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   value={formData.meetingLink}
                   onChange={handleInputChange}
                   placeholder="https://meet.google.com/..."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               <div className="md:col-span-2">
@@ -425,7 +425,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   value={formData.description}
                   onChange={handleInputChange}
                   placeholder="Meeting agenda, goals, etc."
-                  className="w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="textarea w-full px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -433,13 +433,13 @@ const Meetings = ({ userRole = 'CEO' }) => {
               <button
                 type="button"
                 onClick={() => setShowScheduleForm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Schedule Meeting
               </button>
@@ -474,19 +474,15 @@ const Meetings = ({ userRole = 'CEO' }) => {
       {error && scheduledMeetings.length === 0 ? (
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <IconAlertTriangle className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Meetings</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchMeetings} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
+          <button onClick={fetchMeetings} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
         </div>
       ) : scheduledMeetings.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <svg className="w-20 h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
+          <IconCalendar className="w-20 h-20 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 text-lg">No meetings found</p>
           <p className="text-gray-400 text-sm mt-2">
             {filterDepartment !== 'All' ? `No meetings for ${filterDepartment} department` : 'Schedule your first meeting'}
@@ -512,7 +508,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                   </p>
                   <div className="flex items-center space-x-4 mt-3">
                     <span className="text-sm text-gray-600">
-                      📅 {formatDate(meeting.date)} at {meeting.time}
+                      📅 {meetingTime(meeting.date, meeting.time)}
                     </span>
                     {meeting.duration && (
                       <span className="text-sm text-gray-600">
@@ -534,7 +530,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                 <div className="flex items-center space-x-3">
                   <button
                     onClick={() => joinMeeting(meeting.meetingLink)}
-                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
                   >
                     Join meeting
                   </button>
@@ -544,9 +540,7 @@ const Meetings = ({ userRole = 'CEO' }) => {
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete meeting"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                      </svg>
+                      <IconTrash2 className="w-5 h-5" />
                     </button>
                   )}
                 </div>

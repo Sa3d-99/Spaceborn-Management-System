@@ -1,10 +1,11 @@
+import { Plus as IconPlus } from '../Common/Icons';
 import React, { useState, useEffect } from 'react';
 import { 
   LayoutDashboard, CheckSquare, FolderKanban, Users, 
   Coins, Calendar, Bot, Bell, Activity, Database,
   Building2, FileText, LogOut, Menu, ChevronLeft,
   Target, Gift, MessageCircle, Zap, Heart, TrendingUp
-} from 'lucide-react';
+} from '../Common/Icons';
 import authService from '../../services/authService';
 
 const Sidebar = ({ activeMenu, setActiveMenu, onLogout, collapsed = false, onToggleCollapse }) => {
@@ -127,9 +128,7 @@ const Sidebar = ({ activeMenu, setActiveMenu, onLogout, collapsed = false, onTog
       <div className={`p-6 border-b border-gray-200 ${collapsed ? 'px-4' : ''}`}>
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-to-br from-purple-600 to-blue-600 rounded-lg flex items-center justify-center shadow-md">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <IconPlus className="w-5 h-5 text-white" />
           </div>
           {!collapsed && (
             <span className="font-bold text-xl bg-gradient-to-r from-purple-600 to-blue-600 bg-clip-text text-transparent">
@@ -168,9 +167,6 @@ const Sidebar = ({ activeMenu, setActiveMenu, onLogout, collapsed = false, onTog
         {menuItems.map((section, sectionIdx) => (
           <div key={sectionIdx} className="mb-6">
             {!collapsed && (
-              <div className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-3 px-3">
-                {section.section}
-              </div>
             )}
             <div className="space-y-1">
               {section.items.map((item) => (

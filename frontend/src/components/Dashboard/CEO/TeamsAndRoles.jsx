@@ -1,9 +1,10 @@
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/TeamsAndRoles.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Eye, UserX, ChevronRight, Filter, Users, 
   Briefcase, Shield, Building2, AlertCircle 
-} from 'lucide-react';
+} from '../../Common/Icons';
 import employeeService from '../../../services/employeeService';
 import { DEPARTMENTS } from '../../../utils/departments';
 
@@ -286,7 +287,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   placeholder="Search by name or team..." 
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                  className="input w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                 />
               </div>
             </div>
@@ -295,17 +296,17 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                 <select 
                   value={selectedDepartment}
                   onChange={(e) => setSelectedDepartment(e.target.value)}
-                  className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+                  className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
                 >
                   {departments.map(d => <option key={d} value={d}>{d}</option>)}
                 </select>
-                <button className="px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
+                <button className="btn btn-sm btn-ghost px-4 py-2 border border-gray-200 rounded-lg text-sm hover:bg-gray-50 flex items-center gap-2">
                   <Filter className="w-4 h-4" />
                   Hierarchy
                 </button>
               </>
             )}
-            <button className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 flex items-center gap-2">
+            <button className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 flex items-center gap-2">
               <Plus className="w-4 h-4" />
               New {activeTab === 'teams' ? 'Department' : 'Member'}
             </button>
@@ -321,7 +322,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Data</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchAllData} className="px-4 py-2 bg-black text-white rounded-lg">Try Again</button>
+          <button onClick={fetchAllData} className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg">Try Again</button>
         </div>
       )}
 
@@ -329,7 +330,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
       {!error && activeTab === 'teams' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Department</th>
@@ -345,7 +346,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                 {teams.map(team => (
                   <tr key={team.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{team.name}</td>
-                    <td className="px-6 py-4 text-gray-600">{team.lead || 'Not Assigned'}</td>
+                    <td className="px-6 py-4 text-gray-600">{team.lead || 'Awaiting HR assignment'}</td>
                     <td className="px-6 py-4 text-gray-600">{team.members}</td>
                     <td className="px-6 py-4 text-gray-600">{team.projects}</td>
                     <td className="px-6 py-4">
@@ -393,7 +394,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
             <span className="text-sm text-gray-500">{members.length} MEMBERS SHOWN</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Member</th>
@@ -467,7 +468,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
       {!error && activeTab === 'roles' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
@@ -528,10 +529,10 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-sm text-gray-500">Join Date</span>
-                <span className="text-sm text-gray-900">{selectedMember.joinDate ? new Date(selectedMember.joinDate).toLocaleDateString() : 'N/A'}</span>
+                <span className="text-sm text-gray-900">{selectedMember.joinDate ? displayDate(selectedMember.joinDate) : 'N/A'}</span>
               </div>
             </div>
-            <button onClick={() => setShowMemberModal(false)} className="mt-6 w-full px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800">Close</button>
+            <button onClick={() => setShowMemberModal(false)} className="btn btn-sm btn-ghost mt-6 w-full px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800">Close</button>
           </div>
         </div>
       )}
@@ -548,13 +549,13 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
             <div className="flex justify-end space-x-3">
               <button 
                 onClick={() => setShowTerminateConfirm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmTerminate}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Terminate
               </button>

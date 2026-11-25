@@ -1,3 +1,4 @@
+import { businessDate, displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/ActivityMonitor.jsx
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
@@ -236,7 +237,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
       'Department': activity.department || 'N/A',
       'Action': activity.action,
       'Details': activity.details,
-      'Time': new Date(activity.timestamp).toLocaleString(),
+      'Time': displayDateTime(activity.timestamp),
       'Relative Time': formatRelativeTime(activity.timestamp)
     }));
 
@@ -257,7 +258,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Team Activity Report');
     
-    const fileName = `team-activity-${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `team-activity-${businessDate()}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -270,7 +271,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
       a.department || 'N/A',
       a.action,
       `"${a.details?.replace(/"/g, '""') || ''}"`,
-      new Date(a.timestamp).toLocaleString(),
+      displayDateTime(a.timestamp),
       formatRelativeTime(a.timestamp)
     ]);
     const csv = [headers, ...csvData].map(row => row.join(',')).join('\n');
@@ -278,7 +279,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `team-activity-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `team-activity-${businessDate()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -385,7 +386,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Activities</option>
               <option value="report">Reports</option>
@@ -402,7 +403,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="today">Today</option>
               <option value="week">This Week</option>
@@ -416,7 +417,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
             <select
               value={selectedDepartment}
               onChange={(e) => setSelectedDepartment(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             >
               <option value="all">All Departments</option>
               {departments.map(dept => (
@@ -432,7 +433,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
               placeholder="Search by name, action..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+              className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>
           
@@ -444,20 +445,20 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
                 setSelectedDepartment('all');
                 setSearchTerm('');
               }}
-              className="flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className="btn btn-sm btn-ghost flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
               Clear Filters
             </button>
             <button
               onClick={exportToExcel}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2"
               title="Export to Excel"
             >
               📊 Excel
             </button>
             <button
               onClick={exportToCSV}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 flex items-center gap-2"
               title="Export to CSV"
             >
               📄 CSV
@@ -474,7 +475,7 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Activities</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchActivities} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Try Again</button>
+          <button onClick={fetchActivities} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Try Again</button>
         </div>
       ) : filteredActivities.length === 0 ? (
         <div className="bg-white rounded-lg border p-12 text-center">
@@ -538,10 +539,10 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
                     {/* Additional context for managers */}
                     {activity.type === 'pending' && (
                       <div className="mt-2 flex items-center gap-2">
-                        <button className="text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">
+                        <button className="btn btn-sm btn-ghost text-xs px-2 py-1 bg-green-100 text-green-700 rounded hover:bg-green-200">
                           Approve
                         </button>
-                        <button className="text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">
+                        <button className="btn btn-sm btn-ghost text-xs px-2 py-1 bg-red-100 text-red-700 rounded hover:bg-red-200">
                           Reject
                         </button>
                       </div>
@@ -565,13 +566,13 @@ const ActivityMonitor = ({ userRole = 'Manager' }) => {
       <div className="mt-6 bg-blue-50 rounded-lg border border-blue-200 p-4">
         <h3 className="text-sm font-semibold text-blue-800 mb-2">Quick Actions</h3>
         <div className="flex gap-3">
-          <button className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
+          <button className="btn btn-sm btn-ghost px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
             Review Pending Leave Requests
           </button>
-          <button className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
+          <button className="btn btn-sm btn-ghost px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
             Check Team Reports
           </button>
-          <button className="px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
+          <button className="btn btn-sm btn-ghost px-3 py-1.5 bg-white text-blue-600 rounded-lg text-sm border border-blue-200 hover:bg-blue-50">
             View Team Tasks
           </button>
         </div>

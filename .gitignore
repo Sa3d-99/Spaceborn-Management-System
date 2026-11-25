@@ -131,3 +131,6 @@ backend/data/
 
 # Bulk import output (contains temporary passwords)
 employee-credentials-*.csv
+
+# Local Graphify graph and generated Obsidian vault
+/graphify-out/

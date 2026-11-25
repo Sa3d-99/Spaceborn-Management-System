@@ -1,3 +1,7 @@
+import TaskActions from '../../Common/TaskActions';
+import { businessDate } from '../../../utils/timeZone';
+import { AlertTriangle as IconAlertTriangle, Plus as IconPlus, Tasks as IconTasks, X as IconX } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/TeamLead/TaskManagement.jsx
 import React, { useState, useEffect } from 'react';
 
@@ -228,7 +232,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
       resetNewTaskForm();
     } catch (error) {
       console.error('Error creating task:', error);
-      alert('Failed to create task');
+      alert(error.message || 'Failed to create task');
     }
   };
 
@@ -301,7 +305,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const currentUser = authService.getCurrentUser();
@@ -357,11 +361,9 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
           disabled={currentUser?.role !== 'Team Lead'}
           style={currentUser?.role !== 'Team Lead' ? { opacity: 0.5, cursor: 'not-allowed' } : undefined}
 
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
+          <IconPlus className="w-4 h-4" />
           Assign New Task
         </button>
       </div>
@@ -374,12 +376,12 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
             placeholder="Search by name or task..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            className="input px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
           />
           <select 
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
           >
             {statuses.map(status => (
               <option key={status} value={status}>{status}</option>
@@ -390,7 +392,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
               setSearchQuery('');
               setSelectedStatus('All');
             }}
-            className="px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
+            className="btn btn-sm btn-ghost px-4 py-2 text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50 text-sm"
           >
             Clear Filters
           </button>
@@ -401,31 +403,27 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
       {error && tasks.length === 0 ? (
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <IconAlertTriangle className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Tasks</h3>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={fetchTasks}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
           >
             Try Again
           </button>
         </div>
       ) : tasks.length === 0 ? (
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <svg className="w-20 h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
-          </svg>
+          <IconTasks className="w-20 h-20 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 text-lg">No tasks found</p>
           <p className="text-gray-400 text-sm mt-2">Assign tasks to your team members</p>
         </div>
       ) : (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">MEMBER</th>
@@ -515,9 +513,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Assign New Task</h2>
                 <button onClick={() => setShowCreateModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IconX className="w-6 h-6" />
                 </button>
               </div>
               
@@ -529,7 +525,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     required
                     value={newTask.title}
                     onChange={(e) => setNewTask({...newTask, title: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     placeholder="Enter task title"
                   />
                 </div>
@@ -540,7 +536,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     required
                     value={newTask.assignedTo}
                     onChange={(e) => setNewTask({...newTask, assignedTo: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     <option value="">Select Team Member</option>
                     {(() => {
@@ -572,7 +568,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     rows="3"
                     value={newTask.description}
                     onChange={(e) => setNewTask({...newTask, description: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="Describe the task details..."
                   />
                 </div>
@@ -583,7 +579,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     <select
                       value={newTask.priority}
                       onChange={(e) => setNewTask({...newTask, priority: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
@@ -594,10 +590,11 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     <label className="block text-sm font-medium text-gray-700 mb-1">Due Date *</label>
                     <input
                       type="date"
+                      min={businessDate()}
                       required
                       value={newTask.dueDate}
                       onChange={(e) => setNewTask({...newTask, dueDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                   </div>
                 </div>
@@ -610,16 +607,16 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                     step="0.5"
                     value={newTask.estimatedHours}
                     onChange={(e) => setNewTask({...newTask, estimatedHours: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     placeholder="Hours"
                   />
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-4">
-                  <button type="button" onClick={() => setShowCreateModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
+                  <button type="button" onClick={() => setShowCreateModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
                     Cancel
                   </button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
+                  <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
                     Assign Task
                   </button>
                 </div>
@@ -637,9 +634,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Task Details</h2>
                 <button onClick={() => setShowTaskModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IconX className="w-6 h-6" />
                 </button>
               </div>
               
@@ -647,6 +642,11 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                 <div>
                   <label className="text-xs text-gray-500 uppercase font-medium">Task Name</label>
                   <p className="text-lg font-semibold text-gray-900">{selectedTask.title}</p>
+                  <TaskActions task={selectedTask} employees={teamMembers} onChanged={async () => {
+                    setShowTaskModal(false);
+                    setSelectedTask(null);
+                    await fetchTasks();
+                  }} />
                 </div>
 
                 <div>
@@ -701,11 +701,11 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
                       onChange={(e) => {
                         setSelectedTask({...selectedTask, progress: parseInt(e.target.value)});
                       }}
-                      className="w-full"
+                      className="range w-full"
                     />
                     <button
                       onClick={() => updateTaskProgress(getTaskId(selectedTask), selectedTask.progress)}
-                      className="mt-2 w-full px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
+                      className="btn btn-sm btn-ghost mt-2 w-full px-3 py-1.5 bg-purple-600 text-white text-sm rounded-lg hover:bg-purple-700"
                     >
                       Update Progress
                     </button>

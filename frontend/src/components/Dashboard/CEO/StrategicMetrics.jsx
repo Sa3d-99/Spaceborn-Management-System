@@ -1,6 +1,7 @@
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/StrategicMetrics.jsx
 import React, { useState, useEffect } from 'react';
-import { DollarSign, TrendingUp, PieChart, Target, AlertCircle } from 'lucide-react';
+import { DollarSign, TrendingUp, PieChart, Target, AlertCircle } from '../../Common/Icons';
 import authService from '../../../services/authService';
 
 const StrategicMetrics = ({ userRole = 'CEO' }) => {
@@ -247,7 +248,7 @@ const StrategicMetrics = ({ userRole = 'CEO' }) => {
           <select
             value={period}
             onChange={(e) => setPeriod(e.target.value)}
-            className="px-3 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+            className="select px-3 py-1 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
           >
             <option value="month">This Month</option>
             <option value="quarter">This Quarter</option>
@@ -334,7 +335,7 @@ const StrategicMetrics = ({ userRole = 'CEO' }) => {
       <div className="px-6 py-3 bg-gray-50 border-t border-gray-100">
         <div className="flex items-center justify-between text-sm">
           <div className="flex items-center space-x-4">
-            <span className="text-gray-600">Last updated: {new Date().toLocaleDateString()}</span>
+            <span className="text-gray-600">Last updated: {displayDate(new Date())}</span>
             <span className="text-gray-300">|</span>
             <span className="text-gray-600">Data source: Finance & Analytics</span>
           </div>

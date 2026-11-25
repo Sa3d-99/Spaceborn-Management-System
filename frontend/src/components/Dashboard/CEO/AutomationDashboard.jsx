@@ -1,3 +1,4 @@
+import { displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/AutomationDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { 
@@ -5,7 +6,7 @@ import {
   RefreshCw, CheckCircle, AlertCircle, Send, Users,
   BarChart3, Activity, Zap, Settings, Play, Pause,
   AlertTriangle, Shield, Eye, Download, Trash2, Plus
-} from 'lucide-react';
+} from '../../Common/Icons';
 import automationService from '../../../services/automationService';
 import employeeService from '../../../services/employeeService';
 import warningSimulatorService from '../../../services/warningSimulatorService';
@@ -218,13 +219,13 @@ const AutomationDashboard = ({ user, userRole }) => {
           <div className="flex gap-3">
             <button 
               onClick={runAutoScan}
-              className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 flex items-center gap-2"
             >
               <Zap className="w-4 h-4" /> Auto-Scan Warnings
             </button>
             <button 
               onClick={runManualSync}
-              className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" /> Sync Now
             </button>
@@ -306,7 +307,7 @@ const AutomationDashboard = ({ user, userRole }) => {
             <p className="text-sm text-gray-500">Automatically tracked attendance for this month</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
@@ -353,7 +354,7 @@ const AutomationDashboard = ({ user, userRole }) => {
             <select 
               value={selectedPeriod} 
               onChange={(e) => setSelectedPeriod(e.target.value)} 
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+              className="select px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
             >
               <option value="week">This Week</option>
               <option value="month">This Month</option>
@@ -374,7 +375,7 @@ const AutomationDashboard = ({ user, userRole }) => {
                     <p className="font-medium text-gray-900">{report.title}</p>
                     <p className="text-sm text-gray-500">{report.date} • {report.type}</p>
                   </div>
-                  <button className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
+                  <button className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
                     <Download className="w-4 h-4" /> Download
                   </button>
                 </div>
@@ -464,7 +465,7 @@ const AutomationDashboard = ({ user, userRole }) => {
               </h3>
               <button 
                 onClick={sendTestEmail} 
-                className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-2"
+                className="btn btn-sm btn-ghost px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-2"
               >
                 <Send className="w-3 h-3" /> Test Email
               </button>
@@ -502,7 +503,7 @@ const AutomationDashboard = ({ user, userRole }) => {
                   <div key={idx} className="px-6 py-4 hover:bg-gray-50 transition-colors flex justify-between items-center">
                     <div className="flex-1">
                       <p className="text-sm font-medium text-gray-900">{notif.subject || `Warning Email`}</p>
-                      <p className="text-xs text-gray-500">To: {notif.to} • {new Date(notif.sentAt).toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">To: {notif.to} • {displayDateTime(notif.sentAt)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-1 text-xs rounded-full ${
@@ -512,7 +513,7 @@ const AutomationDashboard = ({ user, userRole }) => {
                       </span>
                       <button 
                         onClick={() => handlePreviewEmail(notif)}
-                        className="px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="btn btn-sm btn-ghost px-2 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       >
                         Preview
                       </button>
@@ -533,7 +534,7 @@ const AutomationDashboard = ({ user, userRole }) => {
               <Bell className="w-4 h-4 text-purple-600" />
               Auto Reminders
             </h3>
-            <button className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
+            <button className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
               <Plus className="w-4 h-4" /> Create Reminder
             </button>
           </div>

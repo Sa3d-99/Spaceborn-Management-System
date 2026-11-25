@@ -1,17 +1,23 @@
-const bcrypt = require('bcryptjs');
+const { randomUUID } = require('node:crypto');
+const { hashPassword, verifyPassword } = require('../utils/passwords');
 const jwt = require('jsonwebtoken');
 const createPgModel = require('./createPgModel');
+const { getJwtSecret } = require('../utils/jwtSecret');
 
 const UserModel = createPgModel('users', {
+  patchOnSave: true,
   methods: {
     async comparePassword(enteredPassword) {
-      if (!this.password || !enteredPassword) return false;
-      return bcrypt.compare(enteredPassword, this.password);
+      return verifyPassword(enteredPassword, this.password);
+    },
+    toJSON() {
+      const { password, ...publicUser } = this;
+      return publicUser;
     },
     getSignedJwtToken() {
       return jwt.sign(
-        { id: this._id, role: this.role, employeeId: this.employeeId },
-        process.env.JWT_SECRET || 'spaceborn-secret-key',
+        { id: this._id, role: this.role, employeeId: this.employeeId, pv: this.passwordVersion },
+        getJwtSecret(),
         { expiresIn: process.env.JWT_EXPIRE || '24h' }
       );
     }
@@ -31,13 +37,14 @@ const UserModel = createPgModel('users', {
     }
   },
   preSave: [
-    async function() {
+    async function(previous) {
       if (!this.fullName && (this.firstName || this.lastName)) {
         this.fullName = `${this.firstName || ''} ${this.lastName || ''}`.trim();
       }
-      if (this.password && !this.password.startsWith('$2')) {
-        const salt = await bcrypt.genSalt(10);
-        this.password = await bcrypt.hash(this.password, salt);
+      if (this.password && this.password !== previous?.password) {
+        this.password = await hashPassword(this.password);
+        this.passwordVersion = randomUUID();
+        this.passwordChangedAt = Date.now();
       }
       if (this.isActive === undefined) this.isActive = true;
       if (this.isOnline === undefined) this.isOnline = false;

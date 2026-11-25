@@ -1,3 +1,4 @@
+import { displayDate, displayDateTime } from '../utils/timeZone';
 // src/services/emailSimulatorService.js
 class EmailSimulatorService {
   constructor() {
@@ -186,7 +187,7 @@ class EmailSimulatorService {
             <h3 style="margin-top: 0;">📅 Meeting Details</h3>
             <table style="width: 100%;">
               <tr><td><strong>Title:</strong></td><td>${data.title || 'Team Sync Meeting'}</td></tr>
-              <tr><td><strong>Date:</strong></td><td>${data.date ? new Date(data.date).toLocaleString() : new Date().toLocaleString()}</td></tr>
+              <tr><td><strong>Date:</strong></td><td>${data.date ? displayDateTime(data.date) : new Date().toLocaleString()}</td></tr>
               <tr><td><strong>Duration:</strong></td><td>${data.duration || '1 hour'}</td></tr>
               <tr><td><strong>Attendees:</strong></td><td>${(data.attendees || ['Team Members']).join(', ')}</td></tr>
             </table>
@@ -219,7 +220,7 @@ class EmailSimulatorService {
                 ${(data.tasks || [{ name: 'Complete project documentation', dueDate: '2026-06-05', daysOverdue: 3 }]).map(task => `
                   <tr style="border-top: 1px solid #eee;">
                     <td style="padding: 10px;">${task.name}</td>
-                    <td style="padding: 10px;">${new Date(task.dueDate).toLocaleDateString()}</td>
+                    <td style="padding: 10px;">${displayDate(task.dueDate)}</td>
                     <td style="padding: 10px; color: #e74c3c;">${task.daysOverdue} days</td>
                   </tr>
                 `).join('')}

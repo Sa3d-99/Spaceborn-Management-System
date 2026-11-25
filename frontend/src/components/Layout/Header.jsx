@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Search, Bell, HelpCircle, Menu, X, User, ChevronDown } from 'lucide-react';
+import { Search, Bell, HelpCircle, Menu, X, User, ChevronDown } from '../Common/Icons';
 import { roleLabel } from '../../utils/roleLabels';
 
 export const Header = ({ userName, role, notifications, onMenuClick }) => {
@@ -24,7 +24,7 @@ export const Header = ({ userName, role, notifications, onMenuClick }) => {
               <input
                 type="text"
                 placeholder="Search projects, teams, or members..."
-                className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                className="input w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
               />
             </div>
           </div>

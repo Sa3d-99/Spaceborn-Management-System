@@ -1,3 +1,4 @@
+const { businessDate } = require('../utils/businessTime');
 const Task = require('../models/Task');
 const User = require('../models/User');
 const Meeting = require('../models/Meeting');
@@ -651,7 +652,7 @@ exports.submitTeamLeadDailyReport = async (req, res) => {
       userRole: req.user.role,
       department: req.user.department || '',
       employeeId: req.user.employeeId,
-      date: new Date().toISOString().split('T')[0],
+      date: businessDate(),
       completedTasks: req.body.highlights || '',
       ongoingWork: req.body.summary || '',
       issuesFaced: req.body.challenges || '',

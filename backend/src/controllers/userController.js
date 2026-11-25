@@ -1,8 +1,8 @@
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 const { uploadEmployeeDocumentToDrive } = require('../services/googleDriveService');
-const { canTerminateUser } = require('../utils/terminationPermissions');
-const crypto = require('crypto');
+const { canTerminateUser, canAssignEmployeeRole, effectiveRole } = require('../utils/terminationPermissions');
+const { passwordError, generatePassword } = require('../utils/passwords');
 const { DEPARTMENTS, normalizeDepartment, normalizeDepartments } = require('../config/departments');
 
 const getFullName = (user) =>
@@ -69,7 +69,7 @@ const toEmployeeDto = (user) => {
     lastName: plain.lastName,
     email: plain.email,
     phone: plain.phone || '',
-    role: plain.role,
+    role: effectiveRole(plain),
     department: normalizeDepartment(plain.department || ''),
     designation: plain.designation || '',
     team: plain.team || '',
@@ -102,11 +102,6 @@ const splitName = (body) => {
     firstName: parts[0],
     lastName: parts.slice(1).join(' ') || parts[0],
   };
-};
-
-const generateRandomPassword = () => {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-  return Array.from({ length: 12 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('');
 };
 
 const buildEmployeeQuery = (queryParams = {}, currentUser = null) => {
@@ -157,7 +152,12 @@ exports.createEmployee = async (req, res) => {
 
     const employeeRole = role || 'Member';
     const employeeId = req.body.employeeId || await User.generateEmployeeId(employeeRole);
-    const initialPassword = password || `${employeeId}@123`;
+    const initialPassword = password || generatePassword();
+    const policyError = passwordError(initialPassword);
+    if (policyError) return res.status(400).json(formatResponse(false, policyError));
+    if (!canAssignEmployeeRole(req.user.role, role || 'Member')) {
+      return res.status(403).json(formatResponse(false, 'You cannot assign this role'));
+    }
 
     // Get the manager who is creating this employee
     const createdByName = getFullName(req.user);
@@ -289,6 +289,14 @@ exports.updateEmployee = async (req, res) => {
       return res.status(404).json(formatResponse(false, 'Employee not found'));
     }
 
+    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user)) ||
+        (role && role !== user.role && !canAssignEmployeeRole(req.user.role, role))) {
+      return res.status(403).json(formatResponse(false, 'You cannot update this account'));
+    }
+    if ((isActive === false || (status && !['Active', 'active'].includes(status))) && !canTerminateUser(req.user, user)) {
+      return res.status(403).json(formatResponse(false, 'You cannot deactivate this employee'));
+    }
+
     // Check if email is being changed and if it already exists
     if (email && email !== user.email) {
       const existingEmail = await User.findOne({ email: email.toLowerCase() });
@@ -325,11 +333,9 @@ exports.updateEmployee = async (req, res) => {
 // @access  Private (Manager, CEO)
 exports.resetPassword = async (req, res) => {
   try {
-    const newPassword = req.body.newPassword || generateRandomPassword();
-
-    if (newPassword.length < 6) {
-      return res.status(400).json(formatResponse(false, 'Password must be at least 6 characters'));
-    }
+    const newPassword = req.body?.newPassword ?? generatePassword();
+    const policyError = passwordError(newPassword);
+    if (policyError) return res.status(400).json(formatResponse(false, policyError));
 
     const user = await User.findById(req.params.id).select('+password');
 
@@ -337,6 +343,9 @@ exports.resetPassword = async (req, res) => {
       return res.status(404).json(formatResponse(false, 'Employee not found'));
     }
 
+    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user))) {
+      return res.status(403).json(formatResponse(false, 'You cannot reset this account'));
+    }
     // Update password
     user.password = newPassword;
     user.passwordChangedAt = Date.now();
@@ -364,6 +373,9 @@ exports.deactivateEmployee = async (req, res) => {
       return res.status(404).json(formatResponse(false, 'Employee not found'));
     }
 
+    if (!canTerminateUser(req.user, user)) {
+      return res.status(403).json(formatResponse(false, 'You cannot deactivate this employee'));
+    }
     user.isActive = false;
     await user.save();
 
@@ -385,6 +397,9 @@ exports.activateEmployee = async (req, res) => {
       return res.status(404).json(formatResponse(false, 'Employee not found'));
     }
 
+    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user))) {
+      return res.status(403).json(formatResponse(false, 'You cannot activate this account'));
+    }
     user.isActive = true;
     await user.save();
 
@@ -403,7 +418,7 @@ exports.getEmployees = async (req, res) => {
       .select('-password')
       .sort({ createdAt: -1 });
 
-    res.status(200).json(formatResponse(true, 'Employees fetched successfully', employees.map(toEmployeeDto)));
+    res.status(200).json(formatResponse(true, 'Employees fetched successfully', employees.map(employee => ({ ...toEmployeeDto(employee), canDeactivate: canTerminateUser(req.user, employee) }))));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
   }
@@ -536,7 +551,7 @@ exports.deleteEmployee = async (req, res) => {
     if (!targetUser) return res.status(404).json(formatResponse(false, 'Employee not found'));
 
     const actor = req.user;
-    const allowed = canTerminateUser(actor, { role: targetUser.role });
+    const allowed = canTerminateUser(actor, targetUser);
 
     if (!allowed) {
       return res.status(403).json(formatResponse(false, 'You do not have permission to terminate this employee'));

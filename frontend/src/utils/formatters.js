@@ -1,3 +1,4 @@
+import { displayDate, displayDateTime } from './timeZone';
 // src/utils/formatters.js
 // Dynamic formatters that work with any data format
 
@@ -8,8 +9,8 @@ export const formatDate = (dateString, options = {}) => {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return 'Invalid Date';
     const defaultOptions = { year: 'numeric', month: 'short', day: 'numeric' };
-    return date.toLocaleDateString(
-      navigator.language || 'en-US', 
+    return displayDate(
+      dateString, navigator.language || 'en-IN',
       { ...defaultOptions, ...options }
     );
   } catch {
@@ -22,7 +23,7 @@ export const formatDateTime = (dateString) => {
   try {
     const date = new Date(dateString);
     if (isNaN(date.getTime())) return dateString;
-    return date.toLocaleString(navigator.language || 'en-US', {
+    return displayDateTime(date, navigator.language || 'en-IN', {
       year: 'numeric',
       month: 'short',
       day: 'numeric',

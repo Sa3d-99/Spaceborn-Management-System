@@ -1,10 +1,14 @@
+import { Upload } from '../../Common/Icons';
+import { Folder as IconFolder, Plus as IconPlus, Search as IconSearch } from '../../Common/Icons';
+import { businessDate, displayDateTime } from '../../../utils/timeZone';
+import { resetEmployeePassword } from '../CEO/employeeClient';
+import authService from '../../../services/authService';
 // src/components/Dashboard/Manager/EmployeeManagement.jsx
 import React, { useState } from 'react';
 import { DEPARTMENTS, normalizeDepartment } from '../../../utils/departments';
 import { 
   employeeMasterData, 
   addEmployee,
-  resetEmployeePassword,
   getEmployeeStats
 } from '../../../data/employeeData';
 import employeeService from '../../../services/employeeService';
@@ -52,7 +56,7 @@ const EmployeeManagement = ({
     emergencyContact: { name: '', relation: '', phone: '' },
     education: { college: '', degree: '', specialization: '', graduationYear: '', cgpa: '' },
     skills: [],
-    joinDate: new Date().toISOString().split('T')[0],
+    joinDate: businessDate(),
     workLocation: 'Remote',
     bankDetails: { accountNumber: '', ifscCode: '', bankName: '', accountHolderName: '' }
   });
@@ -71,7 +75,6 @@ const EmployeeManagement = ({
     if (!employee) return false;
     if (userRole === 'CEO') return true;
     if (userRole === 'COO') return employee.role !== 'CEO';
-    if (userRole === 'Manager') return !['CEO', 'COO'].includes(employee.role);
     return false;
   };
   
@@ -144,7 +147,7 @@ const EmployeeManagement = ({
         emergencyContact: { name: '', relation: '', phone: '' },
         education: { college: '', degree: '', specialization: '', graduationYear: '', cgpa: '' },
         skills: [],
-        joinDate: new Date().toISOString().split('T')[0],
+        joinDate: businessDate(),
         workLocation: 'Remote',
         bankDetails: { accountNumber: '', ifscCode: '', bankName: '', accountHolderName: '' }
       });
@@ -175,7 +178,8 @@ const EmployeeManagement = ({
   const handleResetPassword = async (employee) => {
     if (window.confirm(`Reset password for ${employee.name}? A new temporary password will be generated.`)) {
       try {
-        const newPassword = await resetEmployeePassword(employee.id);
+        const { data } = await resetEmployeePassword(authService.getToken(), employee.id);
+        const newPassword = data.newPassword;
         alert(`Password reset for ${employee.name}.\nNew temporary password: ${newPassword}\nUser will be prompted to change on next login.`);
       } catch (error) {
         console.error('Error resetting password:', error);
@@ -316,18 +320,16 @@ const EmployeeManagement = ({
                 placeholder="Search by name, email or employee ID..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                className="input w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
-              <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-              </svg>
+              <IconSearch className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
             </div>
           </div>
           
           <select
             value={departmentFilter}
             onChange={(e) => setDepartmentFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="select px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
           >
             <option value="all">All Departments</option>
             {departments.map(dept => (
@@ -338,7 +340,7 @@ const EmployeeManagement = ({
           <select
             value={statusFilter}
             onChange={(e) => setStatusFilter(e.target.value)}
-            className="px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+            className="select px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
@@ -349,11 +351,9 @@ const EmployeeManagement = ({
           {canAdd && (
             <button
               onClick={() => setShowImportModal(true)}
-              className="px-4 py-2 border border-purple-600 text-purple-700 rounded-lg hover:bg-purple-50 transition-colors flex items-center space-x-2"
+              className="btn btn-sm btn-ghost px-4 py-2 border border-purple-600 text-purple-700 rounded-lg hover:bg-purple-50 transition-colors flex items-center space-x-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v2a2 2 0 002 2h12a2 2 0 002-2v-2M16 8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
+              <Upload className="w-5 h-5" />
               <span>Import from Excel</span>
             </button>
           )}
@@ -361,11 +361,9 @@ const EmployeeManagement = ({
           {canAdd && (
             <button
               onClick={handleAddEmployee}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <IconPlus className="w-5 h-5" />
               <span>Add Employee</span>
             </button>
           )}
@@ -375,7 +373,7 @@ const EmployeeManagement = ({
       {/* Employee Table */}
       <div className="bg-white rounded-xl border shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full">
+          <table className="table w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
                 <th className="text-left px-6 py-3 text-xs font-medium text-gray-500 uppercase tracking-wider">EMPLOYEE</th>
@@ -400,7 +398,7 @@ const EmployeeManagement = ({
                         {employee.name}
                       </button>
                     </div>
-                    <div className="text-xs text-gray-500 mt-1">{employee.isOnline ? 'Online now' : `Last seen ${employee.lastSeen ? new Date(employee.lastSeen).toLocaleString() : 'recently'}`}</div>
+                    <div className="text-xs text-gray-500 mt-1">{employee.isOnline ? 'Online now' : `Last seen ${employee.lastSeen ? displayDateTime(employee.lastSeen) : 'recently'}`}</div>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{employee.employeeId || employee.id}</td>
                   <td className="px-6 py-4 text-sm text-gray-600">{employee.department}</td>
@@ -419,20 +417,20 @@ const EmployeeManagement = ({
                     <div className="flex space-x-2">
                       <button
                         onClick={() => handleViewEmployee(employee)}
-                        className="px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="btn btn-sm btn-ghost px-2 py-1 text-xs text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       >
                         View
                       </button>
                       <button
                         onClick={() => handleResetPassword(employee)}
-                        className="px-2 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded transition-colors"
+                        className="btn btn-sm btn-ghost px-2 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded transition-colors"
                       >
                         Reset Pwd
                       </button>
                       {canDelete && employee.employmentStatus !== 'terminated' && canTerminateEmployee(employee) && (
                         <button
                           onClick={() => handleTerminate(employee)}
-                          className="px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
+                          className="btn btn-sm btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
                         >
                           Terminate
                         </button>
@@ -481,7 +479,7 @@ const EmployeeManagement = ({
                 <div className="flex items-center space-x-2">
                   <button
                     onClick={() => setShowDocumentUpload(true)}
-                    className="px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                    className="btn btn-sm btn-ghost px-3 py-1 text-sm bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                   >
                     Upload to Drive
                   </button>
@@ -828,11 +826,9 @@ const EmployeeManagement = ({
                         if (!driveToken) login();
                         setShowDocumentUpload(true);
                       }}
-                      className="w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2"
+                      className="btn btn-sm btn-ghost w-full px-4 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center justify-center space-x-2"
                     >
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9m-4 0h.01M9 14h6" />
-                      </svg>
+                      <IconFolder className="w-5 h-5" />
                       <span>{driveToken ? 'Upload Document to Google Drive' : 'Connect Google Drive to Upload'}</span>
                     </button>
                   </div>
@@ -917,14 +913,14 @@ const EmployeeManagement = ({
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
               <button
                 onClick={() => setShowEmployeeModal(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Close
               </button>
               {canEdit && (
                 <button
                   onClick={handleSaveEmployeeChanges}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
                   Save Changes
                 </button>
@@ -960,7 +956,7 @@ const EmployeeManagement = ({
                     type="text"
                     value={newEmployee.name}
                     onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -969,7 +965,7 @@ const EmployeeManagement = ({
                     type="email"
                     value={newEmployee.email}
                     onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -978,7 +974,7 @@ const EmployeeManagement = ({
                     type="tel"
                     value={newEmployee.phone}
                     onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -986,7 +982,7 @@ const EmployeeManagement = ({
                   <select
                     value={newEmployee.department}
                     onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="select w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="">Select Department</option>
                     {DEPARTMENTS.map(dept => (
@@ -1000,7 +996,7 @@ const EmployeeManagement = ({
                     type="text"
                     value={newEmployee.designation}
                     onChange={(e) => setNewEmployee({...newEmployee, designation: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -1009,7 +1005,7 @@ const EmployeeManagement = ({
                     type="date"
                     value={newEmployee.dateOfBirth}
                     onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -1018,13 +1014,13 @@ const EmployeeManagement = ({
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
               <button
                 onClick={() => setShowAddEmployeeModal(false)}
-                className="px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 onClick={handleSaveNewEmployee}
-                className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
               >
                 Add Employee
               </button>
@@ -1050,7 +1046,7 @@ const EmployeeManagement = ({
               <select
                 value={uploadingDocType}
                 onChange={(e) => setUploadingDocType(e.target.value)}
-                className="w-full px-3 py-2 border rounded-lg mb-4 focus:ring-2 focus:ring-purple-500"
+                className="select w-full px-3 py-2 border rounded-lg mb-4 focus:ring-2 focus:ring-purple-500"
               >
                 <option value="">Select Document Type</option>
                 <option value="profile_photo">Profile Photo</option>
@@ -1074,7 +1070,7 @@ const EmployeeManagement = ({
                     alert('Please select a document type first');
                   }
                 }}
-                className="w-full"
+                className="file-input w-full"
               />
               
               {uploadProgress !== null && (
@@ -1092,7 +1088,7 @@ const EmployeeManagement = ({
               {!driveToken && (
                 <button
                   onClick={login}
-                  className="mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                  className="btn btn-sm btn-ghost mt-4 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                 >
                   Connect Google Drive First
                 </button>

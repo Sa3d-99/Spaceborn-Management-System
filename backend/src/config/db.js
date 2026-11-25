@@ -66,8 +66,8 @@ async function connectDB() {
   } else {
     // PGlite includes a WASM runtime; don't load it in cloud deployments using pg.
     const { PGlite } = require('@electric-sql/pglite');
-    const dataDir = path.resolve(__dirname, '../../data/spaceborn_pgdata');
-    if (!fs.existsSync(dataDir)) {
+    const dataDir = process.env.PGLITE_DATA_DIR || path.resolve(__dirname, '../../data/spaceborn_pgdata');
+    if (dataDir !== 'memory://' && !fs.existsSync(dataDir)) {
       fs.mkdirSync(dataDir, { recursive: true });
     }
     console.log(`💾 Starting embedded PGlite database at ${dataDir}...`);
@@ -86,6 +86,31 @@ async function connectDB() {
       CREATE INDEX IF NOT EXISTS idx_${table}_data ON ${table} USING gin (data);
     `);
   }
+
+  await exec(`
+    ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS password_reset_digest TEXT,
+      ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS password_reset_requested_at TIMESTAMPTZ,
+      ADD COLUMN IF NOT EXISTS password_reset_identity JSONB;
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_users_password_reset_digest ON users (password_reset_digest)
+      WHERE password_reset_digest IS NOT NULL;
+    CREATE SEQUENCE IF NOT EXISTS signup_employee_ids;
+    CREATE TABLE IF NOT EXISTS signup_requests (
+      id TEXT PRIMARY KEY,
+      email TEXT UNIQUE NOT NULL,
+      full_name TEXT NOT NULL,
+      department TEXT NOT NULL,
+      status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending', 'approved', 'rejected')),
+      requested_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+      last_notification_attempt TIMESTAMPTZ,
+      admin_notified_at TIMESTAMPTZ,
+      reviewed_at TIMESTAMPTZ,
+      reviewed_by TEXT,
+      user_id TEXT,
+      employee_id TEXT
+    );
+  `);
 
   isConnected = true;
   console.log('✅ PostgreSQL Schema Initialized (18 Tables Ready)');

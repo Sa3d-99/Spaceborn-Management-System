@@ -1,9 +1,10 @@
+import { businessDate, displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/TeamsAndRoles.jsx
 import React, { useState, useEffect } from 'react';
 import { 
   Search, Plus, Eye, UserX, ChevronRight, Filter, Users, 
   Briefcase, Shield, Building2, AlertCircle 
-} from 'lucide-react';
+} from '../../Common/Icons';
 import employeeService from '../../../services/employeeService';
 import authService from '../../../services/authService';
 import { normalizeDepartment, DEPARTMENTS } from '../../../utils/departments';
@@ -268,7 +269,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
         department: user?.department,
         status: 'Active',
         role: newMemberData.role,
-        joinDate: newMemberData.joinDate || new Date().toISOString().split('T')[0]
+        joinDate: newMemberData.joinDate || businessDate()
       };
       
       const result = await employeeService.addEmployee(newMember);
@@ -387,7 +388,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   placeholder={`Search by name or ${activeTab === 'teams' ? 'department' : 'member'}...`}
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
-                  className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full pl-10 pr-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
             </div>
@@ -395,14 +396,14 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
               <select 
                 value={selectedDepartment}
                 onChange={(e) => setSelectedDepartment(e.target.value)}
-                className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
               >
                 {departments.map(d => <option key={d} value={d}>{d}</option>)}
               </select>
             )}
             <button 
               onClick={() => setShowAddMemberModal(true)}
-              className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center gap-2 text-sm"
             >
               <Plus className="w-4 h-4" />
               New Member
@@ -419,7 +420,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Data</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchAllData} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
+          <button onClick={fetchAllData} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
         </div>
       )}
 
@@ -427,7 +428,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
       {!error && activeTab === 'teams' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Department</th>
@@ -443,7 +444,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                 {teams.map(team => (
                   <tr key={team.id} className="hover:bg-gray-50">
                     <td className="px-6 py-4 font-medium text-gray-900">{team.name}</td>
-                    <td className="px-6 py-4 text-gray-600">{team.lead || 'Not Assigned'}</td>
+                    <td className="px-6 py-4 text-gray-600">{team.lead || 'Awaiting HR assignment'}</td>
                     <td className="px-6 py-4 text-gray-600">{team.members}</td>
                     <td className="px-6 py-4 text-gray-600">{team.projects}</td>
                     <td className="px-6 py-4">
@@ -491,7 +492,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
             <span className="text-sm text-gray-500">{members.length} TEAM MEMBERS</span>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Member</th>
@@ -565,7 +566,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
       {!error && activeTab === 'roles' && (
         <div className="bg-white rounded-lg border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Role</th>
@@ -630,10 +631,10 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
               </div>
               <div className="flex justify-between py-2 border-b">
                 <span className="text-sm text-gray-500">Join Date</span>
-                <span className="text-sm text-gray-900">{selectedMember.joinDate ? new Date(selectedMember.joinDate).toLocaleDateString() : 'N/A'}</span>
+                <span className="text-sm text-gray-900">{selectedMember.joinDate ? displayDate(selectedMember.joinDate) : 'N/A'}</span>
               </div>
             </div>
-            <button onClick={() => setShowMemberModal(false)} className="mt-6 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
+            <button onClick={() => setShowMemberModal(false)} className="btn btn-sm btn-ghost mt-6 w-full px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Close</button>
           </div>
         </div>
       )}
@@ -658,7 +659,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   required
                   value={newMemberData.name}
                   onChange={(e) => setNewMemberData({...newMemberData, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="Enter full name"
                 />
               </div>
@@ -670,7 +671,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   required
                   value={newMemberData.email}
                   onChange={(e) => setNewMemberData({...newMemberData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="email@company.com"
                 />
               </div>
@@ -682,7 +683,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   required
                   value={newMemberData.designation}
                   onChange={(e) => setNewMemberData({...newMemberData, designation: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="e.g., Senior Developer"
                 />
               </div>
@@ -693,7 +694,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   required
                   value={newMemberData.role}
                   onChange={(e) => setNewMemberData({...newMemberData, role: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="Member">Member</option>
                   <option value="Lead">Team Lead</option>
@@ -706,7 +707,7 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   type="tel"
                   value={newMemberData.phone}
                   onChange={(e) => setNewMemberData({...newMemberData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   placeholder="+91 98765 43210"
                 />
               </div>
@@ -717,13 +718,13 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
                   type="date"
                   value={newMemberData.joinDate}
                   onChange={(e) => setNewMemberData({...newMemberData, joinDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 />
               </div>
               
               <div className="flex justify-end space-x-3 pt-4">
-                <button type="button" onClick={() => setShowAddMemberModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Add Member</button>
+                <button type="button" onClick={() => setShowAddMemberModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg text-sm hover:bg-blue-700">Add Member</button>
               </div>
             </form>
           </div>
@@ -742,13 +743,13 @@ const TeamsAndRoles = ({ userRole = 'Manager' }) => {
             <div className="flex justify-end space-x-3">
               <button 
                 onClick={() => setShowTerminateConfirm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button 
                 onClick={confirmTerminate}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
               >
                 Terminate
               </button>

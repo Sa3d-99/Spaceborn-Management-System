@@ -2,9 +2,9 @@
 .gitignore
 **/node_modules
 **/build
+graphify-out
 backend/data
 **/uploads
 **/.env
 **/.env.*
-!**/.env.example
 npm-debug.log*

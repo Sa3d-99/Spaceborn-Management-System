@@ -1,3 +1,5 @@
+import { Search as IconSearch } from '../../Common/Icons';
+import { displayDate, displayTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/TeamReports.jsx
 import React, { useState, useEffect } from 'react';
 import reportService from '../../../services/reportService';
@@ -573,7 +575,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
             <select
               value={filterDepartment}
               onChange={(e) => setFilterDepartment(e.target.value)}
-              className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+              className="select px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Departments</option>
               {departments.map(dept => (
@@ -588,12 +590,12 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
                 type="date"
                 value={dateFilter}
                 onChange={(e) => setDateFilter(e.target.value)}
-                className="px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                className="input px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
               />
               {dateFilter && (
                 <button
                   onClick={() => setDateFilter('')}
-                  className="px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg"
+                  className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg"
                 >
                   Clear
                 </button>
@@ -609,11 +611,9 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
                   placeholder="Search roadmaps..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="w-full px-4 py-1.5 pl-10 border border-gray-300 rounded-lg text-sm"
+                  className="input w-full px-4 py-1.5 pl-10 border border-gray-300 rounded-lg text-sm"
                 />
-                <svg className="absolute left-3 top-2 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <IconSearch className="absolute left-3 top-2 w-4 h-4 text-gray-400" />
               </div>
             </div>
           )}
@@ -638,7 +638,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
               sortedDates.map((date) => (
                 <div key={date} className="p-6">
                   <h3 className="font-semibold text-lg text-gray-900 mb-4">
-                    {new Date(date).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
+                    {displayDate(date, 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                   </h3>
                   <div className="space-y-4">
                     {filteredGroupedReports[date]?.map((report) => (
@@ -649,7 +649,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
                             <span className="text-sm text-gray-500 ml-2">({report.userRole})</span>
                             <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">{report.department}</span>
                           </div>
-                          <span className="text-xs text-gray-400">{new Date(report.submittedAt).toLocaleTimeString()}</span>
+                          <span className="text-xs text-gray-400">{displayTime(report.submittedAt)}</span>
                         </div>
                         <div className="text-sm text-gray-600">
                           <p><span className="font-medium">✅ Completed:</span> {report.completedTasks}</p>
@@ -686,7 +686,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
                     </div>
                     <button
                       onClick={() => downloadRoadmap(roadmap)}
-                      className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
+                      className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
                     >
                       Download
                     </button>
@@ -757,7 +757,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
                         </div>
                         <button
                           onClick={() => downloadAttachment(selectedRoadmap, attachment)}
-                          className="shrink-0 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
+                          className="btn btn-sm btn-ghost shrink-0 px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg"
                         >
                           Download
                         </button>

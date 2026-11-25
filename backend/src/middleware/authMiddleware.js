@@ -1,5 +1,7 @@
 const jwt = require('jsonwebtoken');
+const { getJwtSecret } = require('../utils/jwtSecret');
 const User = require('../models/User');
+const { effectiveRole } = require('../utils/terminationPermissions');
 
 // Simple auth middleware.
 // NOTE: Keep response JSON-based so frontend can handle it (avoid HTML 404 pages).
@@ -16,14 +18,14 @@ const protect = async (req, res, next) => {
   }
 
   try {
-    const decoded = jwt.verify(token, process.env.JWT_SECRET || 'spaceborn-secret-key');
+    const decoded = jwt.verify(token, getJwtSecret());
     const user = await User.findById(decoded.id).select('-password');
 
-    if (!user) {
+    if (!user || user.isActive === false || decoded.pv !== user.passwordVersion) {
       return res.status(401).json({
         success: false,
-        message: 'User for this token no longer exists',
-        error: 'USER_NOT_FOUND'
+        message: 'This session is no longer valid. Sign in again.',
+        error: 'INVALID_TOKEN'
       });
     }
 
@@ -39,7 +41,9 @@ const protect = async (req, res, next) => {
       employeeId: user.employeeId,
       name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
       email: user.email,
-      role: user.role,
+      role: effectiveRole(user),
+      designation: user.designation,
+      managerId: user.managerId,
       department: user.department,
       team: user.team,
       manager: user.manager,

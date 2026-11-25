@@ -1,3 +1,5 @@
+import { displayDate } from '../../../utils/timeZone';
+import { AlertTriangle as IconAlertTriangle, Bell as IconBell, Check as IconCheck, X as IconX } from '../../Common/Icons';
 // src/components/Dashboard/Manager/Notifications.jsx
 import React, { useState, useEffect, useCallback } from 'react';
 import authService from '../../../services/authService';
@@ -367,7 +369,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
     if (diffHours < 24) return `${diffHours} hours ago`;
     if (diffDays === 1) return 'Yesterday';
     if (diffDays < 7) return `${diffDays} days ago`;
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(date, 'en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getCategoryColor = (category) => {
@@ -440,11 +442,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
             <div>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} 
-                      d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" 
-                    />
-                  </svg>
+                  <IconBell className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">
@@ -463,7 +461,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
             {notifications.length > 0 && unreadCount > 0 && (
               <button
                 onClick={markAllAsRead}
-                className="px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
+                className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-purple-600 hover:bg-purple-50 rounded-lg transition-colors"
               >
                 Mark all as read
               </button>
@@ -538,15 +536,13 @@ const Notifications = ({ userRole = 'Manager' }) => {
         {error && notifications.length === 0 && (
           <div className="bg-white rounded-xl border border-red-200 p-12 text-center">
             <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-              </svg>
+              <IconAlertTriangle className="w-8 h-8 text-red-600" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Notifications</h3>
             <p className="text-gray-500 mb-4">{error}</p>
             <button 
               onClick={fetchNotifications} 
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors"
             >
               Try Again
             </button>
@@ -557,9 +553,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
         {!error && notifications.length === 0 && (
           <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+              <IconBell className="w-10 h-10 text-gray-400" />
             </div>
             <h3 className="text-lg font-semibold text-gray-900 mb-1">No notifications found</h3>
             <p className="text-gray-500">
@@ -627,7 +621,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
                     <div className="flex items-center space-x-2 ml-4">
                       <button
                         onClick={() => viewDetails(notification)}
-                        className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
+                        className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors shadow-sm"
                       >
                         View Details
                       </button>
@@ -638,9 +632,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
                           className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                           title="Mark as read"
                         >
-                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                          </svg>
+                          <IconCheck className="w-5 h-5" />
                         </button>
                       )}
                       
@@ -649,9 +641,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
                         className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
                         title="Delete"
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                        </svg>
+                        <IconX className="w-5 h-5" />
                       </button>
                     </div>
                   </div>
@@ -698,9 +688,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
                 onClick={() => setShowModal(false)}
                 className="p-2 text-gray-400 hover:text-gray-600 rounded-lg hover:bg-gray-100 transition-colors"
               >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
+                <IconX className="w-5 h-5" />
               </button>
             </div>
 
@@ -766,7 +754,7 @@ const Notifications = ({ userRole = 'Manager' }) => {
                       setShowModal(false);
                       window.location.href = selectedNotification.actionUrl;
                     }}
-                    className="px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
+                    className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-white bg-purple-600 rounded-lg hover:bg-purple-700 transition-colors"
                   >
                     {selectedNotification.actionLabel || 'View Full Details'} →
                   </button>

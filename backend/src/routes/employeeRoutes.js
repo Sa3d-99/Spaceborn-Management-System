@@ -55,8 +55,8 @@ router.get('/:id/leave-balance', getLeaveBalance);
 router.patch('/:id/leave-balance', authorize('CEO', 'COO', 'Manager'), updateLeaveBalance);
 router.get('/:id', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeById);
 router.put('/:id', authorize('CEO', 'COO', 'Manager'), updateEmployee);
-router.delete('/:id', authorize('CEO', 'COO', 'Manager'), deleteEmployee);
-router.get('/', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployees);
+router.delete('/:id', authorize('CEO', 'COO', 'Team Lead', 'HR', 'Coordinator'), deleteEmployee);
+router.get('/', authorize('CEO', 'COO', 'Manager', 'Team Lead', 'HR', 'Coordinator'), getEmployees);
 router.post('/', authorize('CEO', 'COO', 'Manager'), createEmployee);
 
 module.exports = router;

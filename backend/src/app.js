@@ -4,7 +4,12 @@ const express = require('express');
 const cors = require('cors');
 const connectDB = require('./config/db');
 
+const { getJwtSecret } = require('./utils/jwtSecret');
+
+getJwtSecret();
 const app = express();
+const proxyHops = Number(process.env.TRUST_PROXY_HOPS || 0);
+if (Number.isInteger(proxyHops) && proxyHops > 0) app.set('trust proxy', proxyHops);
 
 app.use(cors({
   origin: true,
@@ -72,6 +77,13 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'OK', message: 'Space Born API Running (PostgreSQL / PGlite)' });
 });
 
+app.use('/api', (error, _req, res, next) => {
+  if (res.headersSent) return next(error);
+  const status = error.status >= 400 && error.status < 500 ? error.status : 500;
+  if (status === 500) console.error('API request failed:', error.message);
+  return res.status(status).json({ success: false, message: status === 500 ? 'Request failed.' : 'Invalid request.' });
+});
+
 // ======================
 // Unified Frontend Serving (Approach A)
 // ======================
@@ -81,7 +93,7 @@ if (fs.existsSync(frontendBuildPath)) {
   console.log('📦 Serving compiled React frontend from:', frontendBuildPath);
   app.use(express.static(frontendBuildPath));
 
-  app.get('*', (req, res, next) => {
+  app.get('/{*path}', (req, res, next) => {
     if (req.path.startsWith('/api')) {
       return next();
     }

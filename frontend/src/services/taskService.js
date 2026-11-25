@@ -1,3 +1,4 @@
+import { businessDate, displayDate } from '../utils/timeZone';
 // src/services/taskService.js
 import authService from './authService';
 
@@ -506,7 +507,7 @@ class TaskService {
     const currentUser = authService.getCurrentUser();
     if (!currentUser) return [];
     
-    const today = new Date().toISOString().split('T')[0];
+    const today = businessDate();
     const allLogs = await this.apiRequest('/tasks/my-logs');
     return allLogs.filter(log => log.date === today || new Date(log.createdAt).toISOString().split('T')[0] === today);
   }
@@ -613,9 +614,9 @@ class TaskService {
       task.status || '',
       task.priority || '',
       task.assignedToName || task.assignedTo || '',
-      task.dueDate ? new Date(task.dueDate).toLocaleDateString() : 'N/A',
+      task.dueDate ? displayDate(task.dueDate) : 'N/A',
       `${task.progress || 0}%`,
-      task.createdAt ? new Date(task.createdAt).toLocaleDateString() : 'N/A'
+      task.createdAt ? displayDate(task.createdAt) : 'N/A'
     ]);
     
     const csvContent = [headers, ...rows].map(row => row.join(',')).join('\n');

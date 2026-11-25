@@ -1,3 +1,5 @@
+import { Calendar as IconCalendar, Clock as IconClock, Info as IconInfo } from '../../Common/Icons';
+import { businessDate, displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/TeamLead/TeamLeadLeaveManagement.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -253,7 +255,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
 
   const calculateStats = (leaves, breaks) => {
     const currentUserId = currentUser?.id;
-    const today = new Date().toISOString().split('T')[0];
+    const today = businessDate();
     
     setStats({
       myPendingLeaves: leaves.filter(l => l.userId === currentUserId && l.status === 'pending').length,
@@ -329,7 +331,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   if (isLoading) {
@@ -375,20 +377,16 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
       <div className="flex gap-3">
         <button
           onClick={() => setShowLeaveModal(true)}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-          </svg>
+          <IconCalendar className="w-4 h-4" />
           Request Leave
         </button>
         <button
           onClick={() => setShowBreakModal(true)}
-          className="px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-2 text-sm"
+          className="btn btn-sm btn-ghost px-4 py-2 border border-purple-600 text-purple-600 rounded-lg hover:bg-purple-50 transition-colors flex items-center gap-2 text-sm"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <IconClock className="w-4 h-4" />
           Request Break
         </button>
       </div>
@@ -396,9 +394,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
       {/* Info Banner - No Approval Rights */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
         <p className="text-sm text-blue-700 flex items-center gap-2">
-          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-          </svg>
+          <IconInfo className="w-5 h-5" />
           You have view-only access to team requests. All approvals are handled by Manager/CEO.
         </p>
       </div>
@@ -599,9 +595,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
               
               <div className="bg-blue-50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700 flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <IconInfo className="w-5 h-5" />
                   Your leave request will be sent to Manager/CEO for approval.
                 </p>
               </div>
@@ -612,7 +606,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                   <select
                     value={leaveFormData.leaveType}
                     onChange={(e) => setLeaveFormData({...leaveFormData, leaveType: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     {leaveTypes.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
@@ -628,7 +622,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                       required
                       value={leaveFormData.startDate}
                       onChange={(e) => setLeaveFormData({...leaveFormData, startDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                   </div>
                   <div>
@@ -638,7 +632,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                       required
                       value={leaveFormData.endDate}
                       onChange={(e) => setLeaveFormData({...leaveFormData, endDate: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                   </div>
                 </div>
@@ -650,14 +644,14 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                     required
                     value={leaveFormData.reason}
                     onChange={(e) => setLeaveFormData({...leaveFormData, reason: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="Please provide a reason for your leave request"
                   />
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowLeaveModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Submit Request</button>
+                  <button type="button" onClick={() => setShowLeaveModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Submit Request</button>
                 </div>
               </form>
             </div>
@@ -677,9 +671,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
               
               <div className="bg-blue-50 rounded-lg p-3 mb-4">
                 <p className="text-sm text-blue-700 flex items-center gap-2">
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
+                  <IconInfo className="w-5 h-5" />
                   Your break request will be sent to Manager/CEO for approval.
                 </p>
               </div>
@@ -690,7 +682,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                   <select
                     value={breakFormData.breakType}
                     onChange={(e) => setBreakFormData({...breakFormData, breakType: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   >
                     {breakTypes.map(type => (
                       <option key={type.value} value={type.value}>{type.label}</option>
@@ -705,7 +697,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                     required
                     value={breakFormData.date}
                     onChange={(e) => setBreakFormData({...breakFormData, date: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                    className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                   />
                 </div>
                 
@@ -717,7 +709,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                       required
                       value={breakFormData.startTime}
                       onChange={(e) => setBreakFormData({...breakFormData, startTime: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                   </div>
                   <div>
@@ -727,7 +719,7 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                       required
                       value={breakFormData.endTime}
                       onChange={(e) => setBreakFormData({...breakFormData, endTime: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
+                      className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm"
                     />
                   </div>
                 </div>
@@ -739,14 +731,14 @@ const TeamLeadLeaveManagement = ({ userRole = 'Team Lead' }) => {
                     required
                     value={breakFormData.reason}
                     onChange={(e) => setBreakFormData({...breakFormData, reason: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="Please provide a reason for your break request"
                   />
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowBreakModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
-                  <button type="submit" className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Submit Request</button>
+                  <button type="button" onClick={() => setShowBreakModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">Cancel</button>
+                  <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">Submit Request</button>
                 </div>
               </form>
             </div>

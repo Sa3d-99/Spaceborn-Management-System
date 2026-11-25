@@ -1,3 +1,4 @@
+import { displayDateTime } from '../utils/timeZone';
 // src/services/authService.js
 import { normalizeDepartmentFields } from '../utils/departments';
 
@@ -15,8 +16,6 @@ class AuthService {
     this.loginAttempts = 0;
     this.lockoutUntil = null;
     
-    // Mock password reset requests (for Manager approval workflow)
-    this.mockResetRequests = [];
     
     // Mock user database (Employee ID based)
     this.mockUsers = {
@@ -140,13 +139,7 @@ class AuthService {
     this.getActiveSessionsCount = this.getActiveSessionsCount.bind(this);
     this.getUserSessions = this.getUserSessions.bind(this);
     
-    // NEW: Password Reset Approval Workflow Methods
-    this.requestPasswordReset = this.requestPasswordReset.bind(this);
-    this.getPendingResetRequests = this.getPendingResetRequests.bind(this);
-    this.approveResetRequest = this.approveResetRequest.bind(this);
-    this.rejectResetRequest = this.rejectResetRequest.bind(this);
-    this.getResetRequestStats = this.getResetRequestStats.bind(this);
-    this.hasPendingResetRequest = this.hasPendingResetRequest.bind(this);
+
   }
 
   // Helper method to get auth headers
@@ -296,7 +289,7 @@ class AuthService {
     }
 
     try {
-      const response = await fetch(`${this.API_BASE_URL}/test-login`, {
+      const response = await fetch(`${this.API_BASE_URL}/auth/login`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
@@ -331,7 +324,7 @@ class AuthService {
 
       this.resetLoginAttempts();
 
-      if (!data.token || !data.user) {
+      if (!data.data?.token || !data.data?.user) {
         throw new Error('Invalid response from server');
       }
 
@@ -341,8 +334,8 @@ class AuthService {
         localStorage.removeItem('rememberedEmployeeId');
       }
 
-      const normalizedUser = normalizeDepartmentFields(data.user);
-      this.setSession(normalizedUser, data.token, rememberMe);
+      const normalizedUser = normalizeDepartmentFields(data.data.user);
+      this.setSession(normalizedUser, data.data.token, rememberMe);
 
       return { 
         success: true, 
@@ -506,8 +499,8 @@ class AuthService {
       return { success: false, error: 'All password fields are required' };
     }
 
-    if (newPassword.length < 6) {
-      return { success: false, error: 'New password must be at least 6 characters' };
+    if ([...newPassword.normalize('NFC')].length < 15) {
+      return { success: false, error: 'New password must be at least 15 characters' };
     }
 
     if (currentPassword === newPassword) {
@@ -546,8 +539,8 @@ class AuthService {
       return { success: false, error: 'Employee ID and new password are required' };
     }
     
-    if (newPassword.length < 6) {
-      return { success: false, error: 'Password must be at least 6 characters' };
+    if ([...newPassword.normalize('NFC')].length < 15) {
+      return { success: false, error: 'Password must be at least 15 characters' };
     }
     
     const currentUser = this.getCurrentUser();
@@ -595,331 +588,16 @@ class AuthService {
     }
   }
 
-  // ==================== NEW: PASSWORD RESET APPROVAL WORKFLOW ====================
-
-  // Request password reset (Member calls this - sends request to manager)
-  async requestPasswordReset(employeeId, reason = '') {
-    if (!employeeId) {
-      return { success: false, error: 'Employee ID is required' };
-    }
-    
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const user = this.mockUsers[employeeId.toUpperCase()];
-      if (!user) {
-        return { success: false, error: 'Employee ID not found' };
-      }
-      
-      // Check for existing pending request
-      const existingRequest = this.mockResetRequests.find(
-        r => r.employeeId === employeeId.toUpperCase() && r.status === 'pending'
-      );
-      
-      if (existingRequest) {
-        return { success: false, error: 'You already have a pending reset request. Please wait for manager approval.' };
-      }
-      
-      // Create new reset request
-      const newRequest = {
-        id: Date.now(),
-        employeeId: employeeId.toUpperCase(),
-        employeeName: user.name,
-        employeeEmail: user.email,
-        department: user.department,
-        role: user.role,
-        reason: reason,
-        status: 'pending',
-        requestedAt: new Date().toISOString(),
-      };
-      
-      this.mockResetRequests.push(newRequest);
-      
-      // Find manager for this department
-      const manager = Object.values(this.mockUsers).find(
-        u => u.department === user.department && u.role === 'Manager'
-      );
-      
-      // Simulate notification to manager
-      if (manager) {
-        console.log(`[MOCK] Password reset request notification sent to manager: ${manager.name} (${manager.email})`);
-      }
-      
-      return { 
-        success: true, 
-        message: `Password reset request submitted. Your manager has been notified and will review your request.`,
-        requestId: newRequest.id
-      };
-    }
-    
-    // Real API call
-    try {
-      const response = await fetch(`${this.API_BASE_URL}/auth/request-password-reset`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: employeeId.toUpperCase(), reason }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
-      }
-      
-      return { success: true, message: data.message, requestId: data.requestId };
-    } catch (error) {
-      console.error('Request password reset error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Get pending reset requests (Manager/CEO only)
-  async getPendingResetRequests() {
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-      return [];
-    }
-    
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      let requests = [...this.mockResetRequests];
-      
-      // Only show pending requests
-      return requests.filter(r => r.status === 'pending');
-    }
-    
-    try {
-      const token = this.getToken();
-      const response = await fetch(`${this.API_BASE_URL}/auth/password-resets/pending`, {
-        headers: this.getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch requests');
-      return await response.json();
-    } catch (error) {
-      console.error('Get pending requests error:', error);
-      return [];
-    }
-  }
-
-  // Approve reset request and generate new password (Manager/CEO only)
-  async approveResetRequest(requestId, comments = '') {
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const request = this.mockResetRequests.find(r => r.id === requestId);
-      if (!request) {
-        return { success: false, error: 'Request not found' };
-      }
-      
-      if (request.status !== 'pending') {
-        return { success: false, error: 'Request already processed' };
-      }
-      
-      // Generate new random password
-      const newPassword = this.generateRandomPassword();
-      
-      // Update user password
-      const user = this.mockUsers[request.employeeId];
-      if (user) {
-        user.password = newPassword;
-        user.tempPassword = true;
-      }
-      
-      // Update request status
-      request.status = 'approved';
-      request.approvedBy = currentUser.name;
-      request.approvedAt = new Date().toISOString();
-      request.comments = comments;
-      request.newPassword = newPassword;
-      
-      // Simulate sending email with new password
-      console.log(`[MOCK] Password reset email sent to ${request.employeeEmail}`);
-      console.log(`[MOCK] New password: ${newPassword}`);
-      
-      return { 
-        success: true, 
-        message: `Password reset approved. New password has been sent to ${request.employeeName}'s email.`,
-        newPassword
-      };
-    }
-    
-    try {
-      const token = this.getToken();
-      const response = await fetch(`${this.API_BASE_URL}/auth/password-resets/${requestId}/approve`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ comments }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Approval failed');
-      }
-      
-      return { success: true, message: data.message };
-    } catch (error) {
-      console.error('Approve request error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Reject reset request (Manager/CEO only)
-  async rejectResetRequest(requestId, reason = '') {
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-      return { success: false, error: 'Unauthorized' };
-    }
-    
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const request = this.mockResetRequests.find(r => r.id === requestId);
-      if (!request) {
-        return { success: false, error: 'Request not found' };
-      }
-      
-      if (request.status !== 'pending') {
-        return { success: false, error: 'Request already processed' };
-      }
-      
-      request.status = 'rejected';
-      request.rejectedBy = currentUser.name;
-      request.rejectedAt = new Date().toISOString();
-      request.rejectionReason = reason;
-      
-      // Simulate sending rejection email
-      console.log(`[MOCK] Password reset request rejected notification sent to ${request.employeeEmail}`);
-      console.log(`[MOCK] Reason: ${reason || 'No reason provided'}`);
-      
-      return { success: true, message: `Password reset request rejected.` };
-    }
-    
-    try {
-      const token = this.getToken();
-      const response = await fetch(`${this.API_BASE_URL}/auth/password-resets/${requestId}/reject`, {
-        method: 'PUT',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ reason }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Rejection failed');
-      }
-      
-      return { success: true, message: data.message };
-    } catch (error) {
-      console.error('Reject request error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
-  // Get reset request statistics (Manager/CEO only)
-  async getResetRequestStats() {
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-      return { pending: 0, approvedToday: 0, totalMonth: 0 };
-    }
-    
-    if (this.USE_MOCK) {
-      let requests = [...this.mockResetRequests];
-      
-      const today = new Date().toDateString();
-      const thisMonth = new Date().getMonth();
-      const thisYear = new Date().getFullYear();
-      
-      return {
-        pending: requests.filter(r => r.status === 'pending').length,
-        approvedToday: requests.filter(r => {
-          if (r.status !== 'approved') return false;
-          const approvedDate = new Date(r.approvedAt).toDateString();
-          return approvedDate === today;
-        }).length,
-        totalMonth: requests.filter(r => {
-          const requestDate = new Date(r.requestedAt);
-          return requestDate.getMonth() === thisMonth && requestDate.getFullYear() === thisYear;
-        }).length
-      };
-    }
-    
-    try {
-      const token = this.getToken();
-      const response = await fetch(`${this.API_BASE_URL}/auth/password-resets/stats`, {
-        headers: this.getAuthHeaders(),
-      });
-      
-      if (!response.ok) throw new Error('Failed to fetch stats');
-      return await response.json();
-    } catch (error) {
-      console.error('Get stats error:', error);
-      return { pending: 0, approvedToday: 0, totalMonth: 0 };
-    }
-  }
-
-  // Check if user has a pending reset request
-  async hasPendingResetRequest(employeeId) {
-    if (this.USE_MOCK) {
-      return this.mockResetRequests.some(
-        r => r.employeeId === employeeId.toUpperCase() && r.status === 'pending'
-      );
-    }
-    
-    try {
-      const response = await fetch(`${this.API_BASE_URL}/auth/password-resets/check?employeeId=${employeeId}`);
-      if (!response.ok) return false;
-      const data = await response.json();
-      return data.hasPending;
-    } catch (error) {
-      console.error('Check pending request error:', error);
-      return false;
-    }
-  }
-
-  // Forgot password - request reset (alias for requestPasswordReset)
   async forgotPassword(employeeId) {
-    return this.requestPasswordReset(employeeId);
-  }
-
-  // Immediately generate a temporary password and return it (public flow)
-  async forgotPasswordImmediate(employeeId, reason = '') {
-    if (!employeeId) return { success: false, error: 'Employee ID is required' };
-
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      const user = this.mockUsers[employeeId.toUpperCase()];
-      if (!user) return { success: false, error: 'Employee ID not found' };
-
-      const newPassword = this.generateRandomPassword ? this.generateRandomPassword() : 'tempPass@123';
-      if (this.mockUsers[employeeId.toUpperCase()]) {
-        this.mockUsers[employeeId.toUpperCase()].password = newPassword;
-      }
-      return { success: true, newPassword, message: `Temporary password generated for ${user.name}` };
-    }
-
     try {
-      const response = await fetch(`${this.API_BASE_URL}/auth/forgot-password/immediate`, {
+      const response = await fetch(`${this.API_BASE_URL}/auth/forgot-password`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ employeeId: employeeId.toUpperCase(), reason })
+        body: JSON.stringify({ employeeId })
       });
-
-      const data = await response.json();
-      if (!response.ok) {
-        throw new Error(data.message || 'Request failed');
-      }
-
-      return { success: true, newPassword: data.temporaryPassword, message: data.message };
+      const result = await response.json();
+      return response.ok ? result : { success: false, error: result.message };
     } catch (error) {
-      console.error('Forgot password immediate error:', error);
       return { success: false, error: error.message };
     }
   }
@@ -1101,8 +779,8 @@ class AuthService {
           name: currentUser.name,
           role: currentUser.role,
           department: currentUser.department,
-          loginTime: new Date().toLocaleString(),
-          lastActivity: new Date().toLocaleString(),
+          loginTime: displayDateTime(new Date()),
+          lastActivity: displayDateTime(new Date()),
           ipAddress: '127.0.0.1',
           device: navigator.userAgent,
           status: 'active',

@@ -1,6 +1,7 @@
+import { businessDate, displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/Accounts.jsx
 import React, { useState, useEffect } from 'react';
-import { UserPlus, Mail, Lock, Briefcase, Phone, Calendar, Building2, AlertCircle, CheckCircle, Eye, EyeOff, X, Copy, Download, Search, Filter, Trash2, Edit, Users, Save } from 'lucide-react';
+import { UserPlus, Mail, Lock, Briefcase, Phone, Calendar, Building2, AlertCircle, CheckCircle, Eye, EyeOff, X, Copy, Download, Search, Filter, Trash2, Edit, Users, Save } from '../../Common/Icons';
 import authService from '../../../services/authService';
 import employeeService from '../../../services/employeeService';
 import { randomPassword, updateEmployeeById, resetEmployeePassword, deactivateEmployee, activateEmployee } from './employeeClient';
@@ -21,7 +22,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
     department: '',
     designation: '',
     phone: '',
-    joinDate: new Date().toISOString().split('T')[0],
+    joinDate: businessDate(),
     status: 'Active'
   });
   const [resetPasswordLoading, setResetPasswordLoading] = useState(false);
@@ -39,7 +40,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
       department: account?.department || '',
       designation: account?.designation || '',
       phone: account?.phone || '',
-      joinDate: account?.joinDate ? String(account.joinDate).slice(0,10) : new Date().toISOString().split('T')[0],
+      joinDate: account?.joinDate ? String(account.joinDate).slice(0,10) : businessDate(),
       status: account?.status || 'Active'
     });
     setResetPasswordResult(null);
@@ -60,7 +61,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
     department: '',
     designation: '',
     phone: '',
-    joinDate: new Date().toISOString().split('T')[0]
+    joinDate: businessDate()
   });
 
   const [allAccounts, setAllAccounts] = useState([]);
@@ -113,27 +114,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
   };
 
   // Generate Secure Password
-  const generatePassword = () => {
-    const upper = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ';
-    const lower = 'abcdefghijklmnopqrstuvwxyz';
-    const numbers = '0123456789';
-    const special = '!@#$%^&*';
-    
-    const getRandom = (str) => str[Math.floor(Math.random() * str.length)];
-    
-    let password = '';
-    password += getRandom(upper);
-    password += getRandom(lower);
-    password += getRandom(numbers);
-    password += getRandom(special);
-    
-    for (let i = 0; i < 8; i++) {
-      const all = lower + upper + numbers;
-      password += getRandom(all);
-    }
-    
-    return password.split('').sort(() => Math.random() - 0.5).join('');
-  };
+
 
   // Copy to clipboard
   const copyToClipboard = (text, label) => {
@@ -151,16 +132,16 @@ const Accounts = ({ userRole = 'CEO' }) => {
       'Department': account.department,
       'Designation': account.designation || '-',
       'Phone': account.phone || '-',
-      'Join Date': account.joinDate ? new Date(account.joinDate).toLocaleDateString() : '-',
+      'Join Date': account.joinDate ? displayDate(account.joinDate) : '-',
       'Status': account.status || 'Active',
-      'Created At': account.createdAt ? new Date(account.createdAt).toLocaleDateString() : '-'
+      'Created At': account.createdAt ? displayDate(account.createdAt) : '-'
     }));
 
     const ws = XLSX.utils.json_to_sheet(exportData);
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'All Accounts');
     
-    const fileName = `accounts-${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `accounts-${businessDate()}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -179,7 +160,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Employee Credentials');
     
-    const fileName = `credentials-${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `credentials-${businessDate()}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -344,7 +325,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
       const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
       
       const employeeId = generateEmployeeId();
-      const password = generatePassword();
+      const password = randomPassword();
       
       const accountData = {
         name: formData.fullName,
@@ -363,7 +344,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
       };
       
       try {
-        await fetch(`${API_BASE_URL}/test-register`, {
+        const response = await fetch(`${API_BASE_URL}/auth/register`, {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -378,8 +359,11 @@ const Accounts = ({ userRole = 'CEO' }) => {
             employeeId: accountData.employeeId
           })
         });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.message || 'Could not create account');
       } catch (fetchError) {
-        console.log('API not available, using mock mode');
+        alert(fetchError.message);
+        return;
       }
       employeeService.clearCache();
       
@@ -390,7 +374,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
         initials: initials,
         role: formData.role,
         department: formData.department,
-        date: new Date().toISOString().split('T')[0],
+        date: businessDate(),
         email: formData.email,
         employeeId: employeeId,
         password: password,
@@ -420,7 +404,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
         department: '',
         designation: '',
         phone: '',
-        joinDate: new Date().toISOString().split('T')[0]
+        joinDate: businessDate()
       });
       
       const newStats = { ...stats };
@@ -453,7 +437,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   if (isLoading && allAccounts.length === 0) {
@@ -497,21 +481,21 @@ const Accounts = ({ userRole = 'CEO' }) => {
         <div className="flex gap-3">
           <button
             onClick={() => setShowAllAccounts(!showAllAccounts)}
-            className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 flex items-center gap-2"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 flex items-center gap-2"
           >
             <Users className="w-4 h-4" />
             {showAllAccounts ? 'Hide All Accounts' : 'View All Accounts'}
           </button>
           <button
             onClick={exportToExcel}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
           >
             <Download className="w-4 h-4" />
             Export All Accounts
           </button>
           <button
             onClick={exportCredentialsToExcel}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
+            className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 flex items-center gap-2"
           >
             <Lock className="w-4 h-4" />
             Export Credentials
@@ -554,7 +538,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   type="text"
                   value={employeeForm.fullName}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, fullName: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 />
               </div>
 
@@ -564,7 +548,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   type="email"
                   value={employeeForm.email}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, email: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 />
               </div>
 
@@ -573,7 +557,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                 <select
                   value={employeeForm.role}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, role: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 >
                   {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
                 </select>
@@ -584,7 +568,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                 <select
                   value={employeeForm.department}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, department: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 >
                   <option value="">Select Department</option>
                   {[...new Set([...departments, employeeForm.department])].filter(Boolean).map(dept => (
@@ -599,7 +583,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   type="text"
                   value={employeeForm.designation}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, designation: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 />
               </div>
 
@@ -609,7 +593,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   type="tel"
                   value={employeeForm.phone}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, phone: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 />
               </div>
 
@@ -619,7 +603,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   type="date"
                   value={employeeForm.joinDate}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, joinDate: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 />
               </div>
 
@@ -628,7 +612,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                 <select
                   value={employeeForm.status}
                   onChange={(e) => setEmployeeForm((s) => ({ ...s, status: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 >
                   <option value="Active">Active</option>
                   <option value="Inactive">Inactive</option>
@@ -664,7 +648,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   }
                 }}
                 disabled={employeeModalLoading}
-                className="px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
                 {employeeModalLoading ? 'Saving...' : 'Save'}
@@ -687,7 +671,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   }
                 }}
                 disabled={resetPasswordLoading}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 disabled:opacity-50"
               >
                 {resetPasswordLoading ? 'Resetting...' : 'Reset Password'}
               </button>
@@ -713,7 +697,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                   }
                 }}
                 disabled={terminateLoading}
-                className="px-4 py-2 border border-red-300 rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-red-300 rounded-lg text-red-700 hover:bg-red-50 disabled:opacity-50"
               >
                 {terminateLoading ? 'Processing...' : employeeForm.status === 'Inactive' ? 'Activate' : 'Terminate'}
               </button>
@@ -794,7 +778,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
               <p className="text-xs mt-1">Employee can login with Email and the generated password.</p>
             </div>
             
-            <button onClick={() => setShowCredentials(false)} className="mt-4 w-full px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800">
+            <button onClick={() => setShowCredentials(false)} className="btn btn-sm btn-ghost mt-4 w-full px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800">
               Close
             </button>
           </div>
@@ -819,42 +803,42 @@ const Accounts = ({ userRole = 'CEO' }) => {
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">FULL NAME *</label>
-              <input type="text" name="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="Enter full name" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required />
+              <input type="text" name="fullName" value={formData.fullName} onChange={handleInputChange} placeholder="Enter full name" className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">EMAIL *</label>
-              <input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="email@company.com" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required />
+              <input type="email" name="email" value={formData.email} onChange={handleInputChange} placeholder="email@company.com" className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">ROLE *</label>
-              <select name="role" value={formData.role} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required>
+              <select name="role" value={formData.role} onChange={handleInputChange} className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required>
                 {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">DEPARTMENT *</label>
-              <select name="department" value={formData.department} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required>
+              <select name="department" value={formData.department} onChange={handleInputChange} className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" required>
                 <option value="">Select Department</option>
                 {departments.map(dept => (<option key={dept} value={dept}>{dept}</option>))}
               </select>
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">DESIGNATION</label>
-              <input type="text" name="designation" value={formData.designation} onChange={handleInputChange} placeholder="e.g., Senior Developer" className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" />
+              <input type="text" name="designation" value={formData.designation} onChange={handleInputChange} placeholder="e.g., Senior Developer" className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">PHONE NUMBER</label>
-              <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+1 555 000 0000" className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              <input type="tel" name="phone" value={formData.phone} onChange={handleInputChange} placeholder="+1 555 000 0000" className="input w-full px-3 py-2 border border-gray-300 rounded-lg" />
             </div>
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1">JOIN DATE</label>
-              <input type="date" name="joinDate" value={formData.joinDate} onChange={handleInputChange} className="w-full px-3 py-2 border border-gray-300 rounded-lg" />
+              <input type="date" name="joinDate" value={formData.joinDate} onChange={handleInputChange} className="input w-full px-3 py-2 border border-gray-300 rounded-lg" />
             </div>
           </div>
 
           <div className="flex justify-end space-x-3 pt-4">
-            <button type="button" onClick={() => setFormData({ fullName: '', email: '', role: 'Member', department: '', designation: '', phone: '', joinDate: new Date().toISOString().split('T')[0] })} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Clear</button>
-            <button type="submit" disabled={isLoading} className="px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">
+            <button type="button" onClick={() => setFormData({ fullName: '', email: '', role: 'Member', department: '', designation: '', phone: '', joinDate: businessDate() })} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Clear</button>
+            <button type="submit" disabled={isLoading} className="btn btn-sm btn-ghost px-6 py-2 bg-black text-white rounded-lg hover:bg-gray-800 disabled:opacity-50 flex items-center gap-2">
               {isLoading ? (<><div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>Creating...</>) : (<><UserPlus className="w-4 h-4" />Create Account</>)}
             </button>
           </div>
@@ -867,23 +851,23 @@ const Accounts = ({ userRole = 'CEO' }) => {
           <div className="flex gap-4 mb-4">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <input type="text" placeholder="Search by name, email or employee ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" />
+              <input type="text" placeholder="Search by name, email or employee ID..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="input w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black" />
             </div>
-            <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
+            <select value={selectedRole} onChange={(e) => setSelectedRole(e.target.value)} className="select px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
               <option value="all">All Roles</option>
               {roles.map(role => (<option key={role} value={role}>{roleLabel(role)}</option>))}
             </select>
-            <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
+            <select value={selectedDepartment} onChange={(e) => setSelectedDepartment(e.target.value)} className="select px-4 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black">
               <option value="all">All Departments</option>
               {departments.map(dept => (<option key={dept} value={dept}>{dept}</option>))}
             </select>
-            <button onClick={() => { setSearchTerm(''); setSelectedRole('all'); setSelectedDepartment('all'); }} className="px-4 py-2 text-gray-600 hover:text-gray-800">Clear Filters</button>
+            <button onClick={() => { setSearchTerm(''); setSelectedRole('all'); setSelectedDepartment('all'); }} className="btn btn-sm btn-ghost px-4 py-2 text-gray-600 hover:text-gray-800">Clear Filters</button>
           </div>
 
           {/* All Accounts Table */}
           <div className="bg-white rounded-xl border overflow-hidden">
             <div className="overflow-x-auto">
-              <table className="w-full">
+              <table className="table w-full">
                 <thead className="bg-gray-50 border-b">
                   <tr>
                     <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee ID</th>
@@ -914,7 +898,7 @@ const Accounts = ({ userRole = 'CEO' }) => {
                       <td className="px-6 py-4"><span className="px-2 py-1 bg-gray-100 text-gray-700 text-xs rounded-full">{roleLabel(account.role)}</span></td>
                       <td className="px-6 py-4 text-gray-600">{account.department}</td>
                       <td className="px-6 py-4"><span className="px-2 py-1 bg-green-100 text-green-700 text-xs rounded-full">{account.status || 'Active'}</span></td>
-                      <td className="px-6 py-4 text-gray-600">{account.joinDate ? new Date(account.joinDate).toLocaleDateString() : '-'}</td>
+                      <td className="px-6 py-4 text-gray-600">{account.joinDate ? displayDate(account.joinDate) : '-'}</td>
                       <td className="px-6 py-4">
                         <button
                           className="text-blue-600 text-sm hover:text-blue-800"

@@ -1,3 +1,6 @@
+import { displayTime } from '../../../utils/timeZone';
+import { AlertTriangle as IconAlertTriangle, RefreshCw as IconRefreshCw } from '../../Common/Icons';
+import { businessDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/AttendanceView.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -19,7 +22,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
   const [liveStatus, setLiveStatus] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split('T')[0]);
+  const [selectedDate, setSelectedDate] = useState(businessDate());
   const [selectedDepartment, setSelectedDepartment] = useState('all');
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showMarkModal, setShowMarkModal] = useState(false);
@@ -198,15 +201,13 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
             type="date"
             value={selectedDate}
             onChange={(e) => setSelectedDate(e.target.value)}
-            className="px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <button
             onClick={() => fetchAllData()}
-            className="px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1"
+            className="btn btn-sm btn-ghost px-3 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 flex items-center space-x-1"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-            </svg>
+            <IconRefreshCw className="w-4 h-4" />
             <span>Refresh</span>
           </button>
         </div>
@@ -268,7 +269,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
           <select
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="all">All Departments</option>
             {departments.map((dept) => (
@@ -277,7 +278,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
           </select>
           <button
             onClick={() => setSelectedDepartment('all')}
-            className="px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            className="btn btn-sm btn-ghost px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg"
           >
             Clear Filter
           </button>
@@ -320,13 +321,11 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
       {error && attendanceRecords.length === 0 ? (
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <IconAlertTriangle className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Attendance</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchAllData} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
+          <button onClick={fetchAllData} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
         </div>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
@@ -358,11 +357,11 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
               <div className="mt-3 pt-3 border-t border-gray-100">
                 <div className="flex justify-between text-sm">
                   <span className="text-gray-500">Check In:</span>
-                  <span className="text-gray-900">{formatTime(record.checkIn)}</span>
+                  <span className="text-gray-900">{record.checkInTime ? displayTime(record.checkInTime, 'en-IN', { hour: 'numeric', minute: '2-digit' }) : formatTime(record.checkIn)}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-gray-500">Check Out:</span>
-                  <span className="text-gray-900">{formatTime(record.checkOut)}</span>
+                  <span className="text-gray-900">{record.checkOutTime ? displayTime(record.checkOutTime, 'en-IN', { hour: 'numeric', minute: '2-digit' }) : formatTime(record.checkOut)}</span>
                 </div>
                 <div className="flex justify-between text-sm mt-1">
                   <span className="text-gray-500">Hours:</span>
@@ -375,7 +374,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
       ) : viewMode === 'table' ? (
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Employee</th>
@@ -406,8 +405,8 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
                         {getStatusLabel(record.status)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatTime(record.checkIn)}</td>
-                    <td className="px-6 py-4 text-sm text-gray-600">{formatTime(record.checkOut)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{record.checkInTime ? displayTime(record.checkInTime, 'en-IN', { hour: 'numeric', minute: '2-digit' }) : formatTime(record.checkIn)}</td>
+                    <td className="px-6 py-4 text-sm text-gray-600">{record.checkOutTime ? displayTime(record.checkOutTime, 'en-IN', { hour: 'numeric', minute: '2-digit' }) : formatTime(record.checkOut)}</td>
                     <td className="px-6 py-4 text-sm text-gray-600">{record.hoursWorked || 0}h</td>
                     <td className="px-6 py-4">
                       <button
@@ -483,7 +482,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
                 <select
                   value={markData.status}
                   onChange={(e) => setMarkData({...markData, status: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="present">Present</option>
                   <option value="absent">Absent</option>
@@ -499,7 +498,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
                   type="time"
                   value={markData.checkInTime}
                   onChange={(e) => setMarkData({...markData, checkInTime: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
@@ -509,7 +508,7 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
                   type="time"
                   value={markData.checkOutTime}
                   onChange={(e) => setMarkData({...markData, checkOutTime: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
@@ -520,13 +519,13 @@ const AttendanceView = ({ userRole = 'Manager' }) => {
                   value={markData.notes}
                   onChange={(e) => setMarkData({...markData, notes: e.target.value})}
                   placeholder="Add notes if needed..."
-                  className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
               
               <div className="flex justify-end space-x-3">
-                <button type="button" onClick={() => setShowMarkModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Mark Attendance</button>
+                <button type="button" onClick={() => setShowMarkModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50">Cancel</button>
+                <button type="submit" className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Mark Attendance</button>
               </div>
             </form>
           </div>

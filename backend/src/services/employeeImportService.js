@@ -1,6 +1,7 @@
+const { canTerminateUser, canAssignEmployeeRole } = require('../utils/terminationPermissions');
 // Bulk employee import: turns spreadsheet rows into users.
 // Used by the API (POST /api/employees/import) and the CLI (scripts/importEmployees.js).
-const crypto = require('crypto');
+const { passwordError, generatePassword } = require('../utils/passwords');
 const User = require('../models/User');
 const { normalizeDepartment: officialDepartment } = require('../config/departments');
 
@@ -68,8 +69,9 @@ function mapHeaders(headers) {
 
 function normalizeRole(raw, designation) {
   const r = normalizeHeader(raw || '');
+  const d = normalizeHeader(designation || '');
+  if (/\bco\s*(lead|head)\b/.test(r || d)) return 'CO Head';
   if (!r) {
-    const d = normalizeHeader(designation || '');
     if (/\bchief executive\b|^ceo$/.test(d)) return 'CEO';
     if (/\bchief operating\b|^coo$/.test(d)) return 'COO';
     if (/\bteam lead\b|\btech lead\b/.test(d)) return 'Team Lead';
@@ -78,13 +80,12 @@ function normalizeRole(raw, designation) {
     return 'Member';
   }
   // Spaceborn titles -> internal permission codes (see frontend/src/utils/roleLabels.js):
-  //   CEO -> CEO, Director -> COO, Team Lead / Co-Lead -> Team Lead, Project Manager -> Manager, Intern -> Member
+  //   CEO -> CEO, Director -> COO, Team Lead -> Team Lead, Co-Lead -> CO Head, Project Manager -> Manager, Intern -> Member
   if (r === 'ceo' || r.includes('chief executive') || r.includes('founder & ceo') || r === 'founder') return 'CEO';
   if (r === 'coo' || r.includes('chief operating') || r.includes('director')) return 'COO';
   if (r.includes('project manager') || r === 'pm' || r === 'manager') return 'Manager';
-  if (r.includes('team lead') || r === 'lead' || r === 'tl' || r.includes('tech lead') ||
-      r.includes('co lead') || r.includes('colead') || r.includes('co head') || r === 'cohead') return 'Team Lead';
-  if (r === 'hr' || r.includes('human resource')) return 'HR';
+  if (r.includes('team lead') || r === 'lead' || r === 'tl' || r.includes('tech lead')) return 'Team Lead';
+  if (r === 'hr' || r === 'coordinator' || r.includes('human resource')) return 'HR';
   return 'Member'; // employee, intern, engineer, member, etc.
 }
 
@@ -147,23 +148,13 @@ const rolePrefix = (role) => (
   role === 'CEO' ? 'CEO' :
   role === 'COO' ? 'DIR' :        // Director
   role === 'Manager' ? 'PM' :     // Project Manager
-  role === 'Team Lead' ? 'LD' :   // Team Lead / Co-Lead
+  role === 'Team Lead' ? 'LD' :
   role === 'CO Head' ? 'COH' :
   role === 'HR' ? 'HR' : 'INT'
 );
 
-const generatePassword = () => {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789';
-  return Array.from({ length: 10 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('') + '@1';
-};
-
-// Who may import which roles (mirrors the termination hierarchy).
-function canAssignRole(importerRole, targetRole) {
-  if (!importerRole || importerRole === 'CEO') return true; // CLI has no importer role
-  if (importerRole === 'COO') return targetRole !== 'CEO';
-  if (importerRole === 'Manager' || importerRole === 'HR') return !['CEO', 'COO'].includes(targetRole);
-  return false;
-}
+// Command-line imports run outside the web role boundary.
+const canAssignRole = (actorRole, targetRole) => !actorRole || canAssignEmployeeRole(actorRole, targetRole);
 
 /**
  * Convert raw spreadsheet rows (array of {header: value}) into validated employee records.
@@ -343,6 +334,10 @@ async function importEmployees(rows, opts = {}) {
         continue;
       }
       const changes = Object.fromEntries(Object.entries(fields).filter(([k, v]) => v !== '' && k !== 'employeeId'));
+      if (importer && changes.isActive === false && existing.isActive !== false && !canTerminateUser(importer, existing)) {
+        errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: ['You cannot deactivate this employee'] });
+        continue;
+      }
       if (!dryRun) await User.findByIdAndUpdate(existing._id, { $set: { ...changes, updatedBy: importedBy } });
       updated.push({ row: rowNumber, employeeId: existing.employeeId, name: fields.fullName, email: fields.email, role: fields.role });
       continue;
@@ -350,6 +345,11 @@ async function importEmployees(rows, opts = {}) {
 
     const employeeId = fields.employeeId || nextId(fields.role);
     const initialPassword = password || generatePassword();
+    const policyError = passwordError(initialPassword);
+    if (policyError) {
+      errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: [policyError] });
+      continue;
+    }
     const doc = {
       ...fields,
       employeeId,

@@ -113,28 +113,50 @@ function applyUpdate(doc, update) {
 }
 
 function createPgModel(tableName, options = {}) {
-  const { methods = {}, statics = {}, preSave = [] } = options;
+  const { methods = {}, statics = {}, preSave = [], patchOnSave = false } = options;
 
-  function wrapInstance(data) {
+  function wrapInstance(data, persisted = data) {
     if (!data) return null;
     const instance = { ...data };
+    // Keep a snapshot when callers mutate nested fields before saving.
+    let previous = patchOnSave && persisted
+      ? JSON.parse(JSON.stringify({ ...persisted, toJSON: undefined }))
+      : null;
     instance.id = instance._id = String(data._id || data.id);
 
     for (const [name, fn] of Object.entries(methods)) {
       instance[name] = fn.bind(instance);
     }
 
+    instance.toObject = function() {
+      return this.toJSON ? this.toJSON() : { ...this };
+    };
+
     instance.save = async function() {
       for (const hook of preSave) {
-        await hook.call(instance);
+        await hook.call(instance, previous);
       }
       const db = await getDb();
       instance.updatedAt = new Date().toISOString();
-      await db.query(
-        `INSERT INTO ${tableName} (id, data, updated_at) VALUES ($1, $2, NOW())
-         ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
-        [instance._id, JSON.stringify(instance)]
-      );
+      const record = { ...instance, toJSON: undefined };
+
+      if (previous) {
+        const changed = Object.fromEntries(Object.entries(record).filter(
+          ([key, value]) => value !== undefined && JSON.stringify(previous[key]) !== JSON.stringify(value)
+        ));
+        const removed = Object.keys(previous).filter(key => record[key] === undefined);
+        await db.query(
+          `UPDATE ${tableName} SET data = (data - $3::text[]) || $2::jsonb, updated_at = NOW() WHERE id = $1`,
+          [instance._id, JSON.stringify(changed), removed]
+        );
+      } else {
+        await db.query(
+          `INSERT INTO ${tableName} (id, data, updated_at) VALUES ($1, $2, NOW())
+           ON CONFLICT (id) DO UPDATE SET data = $2, updated_at = NOW()`,
+          [instance._id, JSON.stringify(record)]
+        );
+      }
+      if (patchOnSave) previous = JSON.parse(JSON.stringify(record));
       return instance;
     };
 
@@ -217,7 +239,7 @@ function createPgModel(tableName, options = {}) {
       updatedAt: new Date().toISOString(),
       ...data
     };
-    return wrapInstance(doc);
+    return wrapInstance(doc, null);
   };
 
   Model.find = function(filter = {}) {
@@ -259,7 +281,7 @@ function createPgModel(tableName, options = {}) {
     const existing = await Model.findById(id);
     if (!existing) return null;
     const updated = applyUpdate(existing, update);
-    const inst = wrapInstance(updated);
+    const inst = wrapInstance(updated, existing);
     await inst.save();
     return inst;
   };
@@ -268,7 +290,7 @@ function createPgModel(tableName, options = {}) {
     const existing = await Model.findOne(filter);
     if (!existing) return { matchedCount: 0, modifiedCount: 0 };
     const updated = applyUpdate(existing, update);
-    const inst = wrapInstance(updated);
+    const inst = wrapInstance(updated, existing);
     await inst.save();
     return { matchedCount: 1, modifiedCount: 1 };
   };
@@ -278,7 +300,7 @@ function createPgModel(tableName, options = {}) {
     let count = 0;
     for (const existing of existingList) {
       const updated = applyUpdate(existing, update);
-      const inst = wrapInstance(updated);
+      const inst = wrapInstance(updated, existing);
       await inst.save();
       count++;
     }
@@ -312,6 +334,16 @@ function createPgModel(tableName, options = {}) {
       await db.query(`DELETE FROM ${tableName} WHERE id = $1`, [item._id]);
     }
     return { deletedCount: all.length };
+  };
+
+  Model.updateIfStatus = async function(id, status, changes) {
+    const db = await getDb();
+    const result = await db.query(
+      `UPDATE ${tableName} SET data = data || $3::jsonb, updated_at = NOW()
+       WHERE id = $1 AND data->>'status' = $2 RETURNING data`,
+      [id, status, JSON.stringify({ ...changes, updatedAt: new Date().toISOString() })]
+    );
+    return wrapInstance(result.rows[0]?.data);
   };
 
   Model.countDocuments = async function(filter = {}) {

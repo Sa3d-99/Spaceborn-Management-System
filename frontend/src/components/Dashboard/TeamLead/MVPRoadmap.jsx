@@ -1,3 +1,5 @@
+import { BarChart3 as IconBarChart3, CloudUpload as IconCloudUpload, Document as IconDocument, Download as IconDownload, MessageCircle as IconMessageCircle, Plus as IconPlus, RefreshCw as IconRefreshCw, Users as IconUsers } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Lead/MVPRoadmap.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import roadmapService from '../../../services/roadmapService';
@@ -396,17 +398,17 @@ Title: ${roadmap.title}
 Version: ${roadmap.version}
 Status: ${roadmap.status.toUpperCase()}
 Overall Progress: ${roadmap.overallProgress}%
-Last Updated: ${new Date(roadmap.lastUpdated).toLocaleDateString()}
+Last Updated: ${displayDate(roadmap.lastUpdated)}
 
 DESCRIPTION
 ${roadmap.description}
 
 TIMELINE
-Start Date: ${new Date(roadmap.startDate).toLocaleDateString()}
-Target Date: ${new Date(roadmap.targetDate).toLocaleDateString()}
+Start Date: ${displayDate(roadmap.startDate)}
+Target Date: ${displayDate(roadmap.targetDate)}
 
 MILESTONES
-${roadmap.milestones.map(m => `- ${m.title}: ${m.progress || 0}% (Due: ${new Date(m.dueDate).toLocaleDateString()}) - ${m.status}`).join('\n')}
+${roadmap.milestones.map(m => `- ${m.title}: ${m.progress || 0}% (Due: ${displayDate(m.dueDate)}) - ${m.status}`).join('\n')}
 
 FEATURES
 ${roadmap.features.map(f => `- ${f.name} [${f.priority}] - ${f.status}`).join('\n')}
@@ -418,7 +420,7 @@ BLOCKERS
 ${roadmap.blockers?.map(b => `- ${b}`).join('\n') || 'None'}
 
 PROGRESS HISTORY
-${roadmap.progressHistory?.map(h => `- ${new Date(h.date).toLocaleDateString()}: ${h.progress}% - ${h.notes || 'No notes'}`).join('\n') || 'No history'}
+${roadmap.progressHistory?.map(h => `- ${displayDate(h.date)}: ${h.progress}% - ${h.notes || 'No notes'}`).join('\n') || 'No history'}
 
 ATTACHMENTS
 ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join('\n') || 'None'}
@@ -488,9 +490,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
             <div>
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 bg-gradient-to-br from-purple-600 to-pink-600 rounded-xl flex items-center justify-center shadow-lg">
-                  <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                  </svg>
+                  <IconBarChart3 className="w-5 h-5 text-white" />
                 </div>
                 <div>
                   <h1 className="text-2xl font-bold text-gray-900">MVP Roadmap</h1>
@@ -501,11 +501,9 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
             
             <button
               onClick={() => setShowForm(!showForm)}
-              className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
             >
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-              </svg>
+              <IconPlus className="w-5 h-5" />
               <span>{showForm ? 'Cancel' : 'New Roadmap'}</span>
             </button>
           </div>
@@ -529,7 +527,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     value={formData.title}
                     onChange={(e) => setFormData({...formData, title: e.target.value})}
                     placeholder="e.g., SpaceBorn CMS MVP Roadmap"
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -538,7 +536,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     type="text"
                     value={formData.version}
                     onChange={(e) => setFormData({...formData, version: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -550,7 +548,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                   onChange={(e) => setFormData({...formData, description: e.target.value})}
                   rows="3"
                   placeholder="Describe the overall roadmap goals and objectives..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
@@ -561,7 +559,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     type="date"
                     value={formData.startDate}
                     onChange={(e) => setFormData({...formData, startDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -570,7 +568,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     type="date"
                     value={formData.targetDate}
                     onChange={(e) => setFormData({...formData, targetDate: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -585,9 +583,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                   <div className="flex items-center justify-center w-full">
                     <label className="flex flex-col items-center justify-center w-full h-32 border-2 border-dashed border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50 transition-colors">
                       <div className="flex flex-col items-center justify-center pt-5 pb-6">
-                        <svg className="w-8 h-8 mb-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                        </svg>
+                        <IconCloudUpload className="w-8 h-8 mb-2 text-gray-500" />
                         <p className="mb-2 text-sm text-gray-500">
                           <span className="font-semibold">Click to upload</span> or drag and drop
                         </p>
@@ -599,7 +595,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                         multiple
                         accept=".pdf,.xlsx,.xls,.doc,.docx,.jpg,.jpeg,.png,.txt"
                         onChange={handleFileUpload}
-                        className="hidden"
+                        className="file-input hidden"
                       />
                     </label>
                   </div>
@@ -622,9 +618,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                       <div key={attachment.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
                         <div className="flex items-center space-x-3">
                           <div className="w-8 h-8 bg-purple-100 rounded-lg flex items-center justify-center">
-                            <svg className="w-4 h-4 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                            </svg>
+                            <IconDocument className="w-4 h-4 text-purple-600" />
                           </div>
                           <div>
                             <p className="text-sm font-medium text-gray-900">{attachment.name}</p>
@@ -649,7 +643,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     <div key={milestone.id} className="flex items-center justify-between bg-gray-50 px-3 py-2 rounded-lg">
                       <div>
                         <p className="font-medium text-gray-900">{milestone.title}</p>
-                        <p className="text-xs text-gray-500">Due: {new Date(milestone.dueDate).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500">Due: {displayDate(milestone.dueDate)}</p>
                       </div>
                       <button onClick={() => removeItem('milestones', milestone.id)} className="text-red-500 hover:text-red-700">×</button>
                     </div>
@@ -660,15 +654,15 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                       placeholder="Milestone title"
                       value={newMilestone.title}
                       onChange={(e) => setNewMilestone({...newMilestone, title: e.target.value})}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="input px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
                     <input
                       type="date"
                       value={newMilestone.dueDate}
                       onChange={(e) => setNewMilestone({...newMilestone, dueDate: e.target.value})}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="input px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
-                    <button onClick={handleAddMilestone} className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
+                    <button onClick={handleAddMilestone} className="btn btn-sm btn-ghost px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
                       Add Milestone
                     </button>
                   </div>
@@ -699,18 +693,18 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                       placeholder="Feature name"
                       value={newFeature.name}
                       onChange={(e) => setNewFeature({...newFeature, name: e.target.value})}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2"
+                      className="input px-3 py-2 border border-gray-300 rounded-lg text-sm col-span-2"
                     />
                     <select
                       value={newFeature.priority}
                       onChange={(e) => setNewFeature({...newFeature, priority: e.target.value})}
-                      className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="select px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     >
                       <option value="high">High Priority</option>
                       <option value="medium">Medium Priority</option>
                       <option value="low">Low Priority</option>
                     </select>
-                    <button onClick={handleAddFeature} className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
+                    <button onClick={handleAddFeature} className="btn btn-sm btn-ghost px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
                       Add Feature
                     </button>
                   </div>
@@ -741,19 +735,19 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                       placeholder="Risk description"
                       value={newRisk.description}
                       onChange={(e) => setNewRisk({...newRisk, description: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                      className="input w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
                     />
                     <div className="grid grid-cols-2 gap-2">
                       <select
                         value={newRisk.impact}
                         onChange={(e) => setNewRisk({...newRisk, impact: e.target.value})}
-                        className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
+                        className="select px-3 py-2 border border-gray-300 rounded-lg text-sm"
                       >
                         <option value="high">High Impact</option>
                         <option value="medium">Medium Impact</option>
                         <option value="low">Low Impact</option>
                       </select>
-                      <button onClick={handleAddRisk} className="px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
+                      <button onClick={handleAddRisk} className="btn btn-sm btn-ghost px-3 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700">
                         Add Risk
                       </button>
                     </div>
@@ -762,10 +756,10 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
               </div>
 
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
-                <button onClick={resetForm} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                <button onClick={resetForm} className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                   Cancel
                 </button>
-                <button onClick={handleSubmit} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <button onClick={handleSubmit} className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                   Create Roadmap
                 </button>
               </div>
@@ -803,9 +797,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     <div className="flex items-center space-x-2">
                       {roadmap.sharedWith && roadmap.sharedWith.length > 0 && (
                         <div className="flex items-center space-x-1 px-2 py-1 bg-green-50 rounded-lg">
-                          <svg className="w-4 h-4 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                          </svg>
+                          <IconMessageCircle className="w-4 h-4 text-green-600" />
                           <span className="text-xs text-green-600">Issued</span>
                         </div>
                       )}
@@ -831,16 +823,16 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     <div className="flex items-center justify-between text-sm">
                       <div>
                         <span className="text-gray-500">Start:</span>
-                        <span className="ml-2 font-medium text-gray-900">{new Date(roadmap.startDate).toLocaleDateString()}</span>
+                        <span className="ml-2 font-medium text-gray-900">{displayDate(roadmap.startDate)}</span>
                       </div>
                       <div className="text-gray-400">→</div>
                       <div>
                         <span className="text-gray-500">Target:</span>
-                        <span className="ml-2 font-medium text-gray-900">{new Date(roadmap.targetDate).toLocaleDateString()}</span>
+                        <span className="ml-2 font-medium text-gray-900">{displayDate(roadmap.targetDate)}</span>
                       </div>
                       <div>
                         <span className="text-gray-500">Last Updated:</span>
-                        <span className="ml-2 text-gray-600">{new Date(roadmap.lastUpdated).toLocaleDateString()}</span>
+                        <span className="ml-2 text-gray-600">{displayDate(roadmap.lastUpdated)}</span>
                       </div>
                     </div>
                   </div>
@@ -875,31 +867,25 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                   <div className="flex justify-end space-x-3 pt-4 border-t border-gray-100">
                     <button
                       onClick={() => openProgressModal(roadmap)}
-                      className="px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center space-x-1"
+                      className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-white bg-green-600 hover:bg-green-700 rounded-lg transition-colors flex items-center space-x-1"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-                      </svg>
+                      <IconRefreshCw className="w-4 h-4" />
                       <span>Update Progress</span>
                     </button>
                     <button
                       onClick={() => downloadRoadmap(roadmap)}
-                      className="px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center space-x-1"
+                      className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-gray-600 hover:bg-gray-100 rounded-lg transition-colors flex items-center space-x-1"
                     >
-                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
+                      <IconDownload className="w-4 h-4" />
                       <span>Download</span>
                     </button>
                     
                     {roadmap.status !== 'shared' && (
                       <button
                         onClick={() => handleShare(roadmap)}
-                        className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center space-x-1"
+                        className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center space-x-1"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
-                        </svg>
+                        <IconMessageCircle className="w-4 h-4" />
                         <span>Issue</span>
                       </button>
                     )}
@@ -934,7 +920,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     max="100"
                     value={progressUpdate.overallProgress}
                     onChange={(e) => setProgressUpdate({...progressUpdate, overallProgress: parseInt(e.target.value)})}
-                    className="flex-1"
+                    className="range flex-1"
                   />
                   <span className="text-lg font-bold text-purple-600">{progressUpdate.overallProgress}%</span>
                 </div>
@@ -962,9 +948,9 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                           max="100"
                           value={progress}
                           onChange={(e) => updateMilestoneProgress(milestone.id, parseInt(e.target.value))}
-                          className="w-full"
+                          className="range w-full"
                         />
-                        <p className="text-xs text-gray-500 mt-1">Due: {new Date(milestone.dueDate).toLocaleDateString()}</p>
+                        <p className="text-xs text-gray-500 mt-1">Due: {displayDate(milestone.dueDate)}</p>
                       </div>
                     );
                   })}
@@ -981,7 +967,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                         type="checkbox"
                         checked={progressUpdate.completedFeatures.includes(feature.name)}
                         onChange={() => toggleFeatureCompletion(feature.name)}
-                        className="w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
+                        className="checkbox checkbox-sm w-4 h-4 text-purple-600 rounded focus:ring-purple-500"
                       />
                       <span className="text-gray-700">{feature.name}</span>
                       <span className={`ml-auto px-2 py-0.5 rounded text-xs ${getPriorityBadge(feature.priority)}`}>
@@ -1008,9 +994,9 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                       value={newBlocker}
                       onChange={(e) => setNewBlocker(e.target.value)}
                       placeholder="Add a blocker or issue..."
-                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
+                      className="input flex-1 px-3 py-2 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
                     />
-                    <button onClick={addBlocker} className="px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">
+                    <button onClick={addBlocker} className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg text-sm hover:bg-red-700">
                       Add
                     </button>
                   </div>
@@ -1025,7 +1011,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                   onChange={(e) => setProgressUpdate({...progressUpdate, notes: e.target.value})}
                   rows="3"
                   placeholder="Describe what was accomplished this week, any challenges, etc..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               </div>
 
@@ -1033,13 +1019,13 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
               <div className="flex justify-end space-x-3 pt-4 border-t border-gray-200">
                 <button
                   onClick={() => setShowProgressModal(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveProgressUpdate}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
                   Save Progress
                 </button>
@@ -1066,9 +1052,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
               <div className="bg-purple-50 rounded-lg p-4 mb-6">
                 <div className="flex items-center space-x-3 mb-2">
                   <div className="w-8 h-8 bg-purple-600 rounded-lg flex items-center justify-center">
-                    <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                    </svg>
+                    <IconUsers className="w-4 h-4 text-white" />
                   </div>
                   <div>
                     <p className="font-medium text-gray-900">Manager, CEO & COO</p>
@@ -1080,13 +1064,13 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowShareModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="btn btn-sm btn-ghost flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={issueRoadmapToLeadership}
-                  className="flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
+                  className="btn btn-sm btn-ghost flex-1 px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
                   Issue Now
                 </button>

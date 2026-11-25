@@ -1,149 +1,83 @@
 const HourBreak = require('../models/HourBreak');
-const Notification = require('../models/Notification');
+const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
-
-// ==================== GET ALL HOUR BREAKS ====================
+const { ownsRequest, canReviewRequest, requesterFor, requestVisibility } = require('../utils/requestPermissions');
+const { notifyHourBreakRequested, notifyHourBreakDecision } = require('../utils/notificationDispatcher');
 
 exports.getHourBreaks = async (req, res) => {
-  try {
-    const { role, department, userId } = req.query;
-    let query = {};
-    
-    if (userId) query.userId = parseInt(userId);
-    if (role !== 'Manager' && role !== 'COO' && department) query.department = department;
-    
-    const breaks = await HourBreak.find(query).sort({ createdAt: -1 });
-    res.status(200).json(formatResponse(true, 'Breaks fetched', breaks));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
+  const breaks = await HourBreak.find().sort({ createdAt: -1 });
+  res.json(formatResponse(true, 'Breaks fetched', await requestVisibility(req.user, breaks)));
 };
-
-// ==================== APPLY FOR HOUR BREAK ====================
 
 exports.applyBreak = async (req, res) => {
-  try {
-    const { userId, userName, employeeId, userRole, department, date, hours, reason } = req.body;
-
-    // Approval rules for hour breaks (no attendance impact)
-    // - CEO hour breaks are auto-approved
-    // - Team Lead hour breaks: only Manager can approve/reject
-    // - Manager hour breaks: only CEO can approve/reject
-    const autoApproved = userRole === 'CEO';
-
-    const breakItem = await HourBreak.create({
-      userId, userName, employeeId, userRole, department, date, hours, reason,
-      status: autoApproved ? 'approved' : 'pending',
-      ...(autoApproved ? { approvedBy: 'CEO', approvedOn: new Date() } : {})
-    });
-
-    
-    // Notify manager/CEO
-    await Notification.create({
-      type: 'break_request',
-      title: '⏰ Hour Break Request',
-      message: `${userName} has requested a ${hours} hour break on ${date}. Reason: ${reason}`,
-      fromUserId: userId,
-      fromUserName: userName,
-      fromEmployeeId: employeeId,
-      toRole: userRole === 'Team Lead' ? 'Manager' : 'CEO',
-      relatedId: breakItem._id,
-      relatedModel: 'HourBreak',
-      priority: 'normal'
-    });
-    
-    res.status(201).json(formatResponse(true, 'Break requested', breakItem));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+  const { userId, date, hours, reason } = req.body || {};
+  const actor = req.user;
+  const actorId = String(actor.id || actor._id);
+  const requester = userId && String(userId) !== actorId ? await User.findById(userId) : actor;
+  if (!requester || (requester !== actor && !canReviewRequest(actor, requester))) {
+    return res.status(403).json(formatResponse(false, 'You cannot request an hour break for this employee'));
   }
-};
+  const duration = Number(hours);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date || '') || !Number.isFinite(duration) || duration <= 0 || duration > 24 ||
+      typeof reason !== 'string' || !reason.trim()) {
+    return res.status(400).json(formatResponse(false, 'Enter a date, duration and reason'));
+  }
 
-// ==================== UPDATE BREAK STATUS ====================
+  const autoApproved = requester.role === 'CEO';
+  const record = await HourBreak.create({
+    userId: String(requester.id || requester._id),
+    userName: requester.name || requester.fullName,
+    employeeId: requester.employeeId,
+    userRole: requester.role,
+    department: requester.department,
+    date,
+    hours: duration,
+    reason: reason.trim(),
+    status: autoApproved ? 'approved' : 'pending',
+    ...(autoApproved ? { approvedBy: 'CEO', approvedOn: new Date() } : {})
+  });
+
+  if (!autoApproved) await notifyHourBreakRequested(record, requester).catch(console.error);
+  return res.status(201).json(formatResponse(true, 'Break requested', record));
+};
 
 exports.updateBreakStatus = async (req, res) => {
-  try {
-    const { breakId } = req.params;
-    const { status, approvedBy, rejectionReason } = req.body;
-
-    const breakItem = await HourBreak.findById(breakId);
-    if (!breakItem) {
-      return res.status(404).json(formatResponse(false, 'Break not found'));
-    }
-
-    // Enforce approval hierarchy:
-    // - If requester is Team Lead: only Manager can approve/reject
-    // - If requester is Manager: only CEO can approve/reject
-    // - If requester is CEO: break must be auto-approved; block manual updates
-    const requesterRole = breakItem.userRole;
-    const approverRole = req.user?.role;
-
-    const normalizeStatus = (s) => String(s).toLowerCase();
-    const nextStatus = normalizeStatus(status);
-    if (!['approved', 'rejected'].includes(nextStatus)) {
-      return res.status(400).json(formatResponse(false, 'Invalid status'));
-    }
-
-    if (requesterRole === 'CEO') {
-      return res.status(400).json(formatResponse(false, 'CEO hour breaks are auto-approved'));
-    }
-
-    if (requesterRole === 'Team Lead' && approverRole !== 'Manager') {
-      return res.status(403).json(formatResponse(false, 'Only Manager can approve/reject Team Lead hour breaks'));
-    }
-
-    if (requesterRole === 'Manager' && approverRole !== 'CEO') {
-      return res.status(403).json(formatResponse(false, 'Only CEO can approve/reject Manager hour breaks'));
-    }
-
-    breakItem.status = nextStatus;
-    breakItem.approvedBy = approvedBy || req.user?.fullName || req.user?.firstName || req.user?.lastName || approverRole;
-    breakItem.approvedOn = new Date();
-    if (rejectionReason) breakItem.rejectionReason = rejectionReason;
-    await breakItem.save();
-
-
-    // Notify employee
-    await Notification.create({
-      type: nextStatus === 'approved' ? 'break_approved' : 'break_rejected',
-      title: nextStatus === 'approved' ? '✅ Break Approved' : '❌ Break Rejected',
-      message: nextStatus === 'approved'
-        ? `Your ${breakItem.hours} hour break on ${breakItem.date} has been approved by ${breakItem.approvedBy}.`
-        : `Your ${breakItem.hours} hour break on ${breakItem.date} has been rejected by ${breakItem.approvedBy}. Reason: ${rejectionReason}`,
-      fromUserName: breakItem.approvedBy,
-
-      toUserId: breakItem.userId,
-      relatedId: breakItem._id,
-      relatedModel: 'HourBreak',
-      priority: 'normal'
-    });
-
-    res.status(200).json(formatResponse(true, `Break ${nextStatus}`, breakItem));
-
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+  const { status, rejectionReason } = req.body || {};
+  const nextStatus = String(status).toLowerCase();
+  if (!['approved', 'rejected'].includes(nextStatus)) {
+    return res.status(400).json(formatResponse(false, 'Invalid status'));
   }
-};
+  const record = await HourBreak.findById(req.params.breakId);
+  if (!record) return res.status(404).json(formatResponse(false, 'Break not found'));
 
-// ==================== DELETE BREAK ====================
+  const requester = requesterFor(record, await User.find());
+  if (!canReviewRequest(req.user, requester)) {
+    return res.status(403).json(formatResponse(false, 'You cannot review this hour break'));
+  }
+
+  const updated = await HourBreak.updateIfStatus(record.id, 'pending', {
+    status: nextStatus,
+    approvedBy: req.user.name || req.user.role,
+    approvedOn: new Date(),
+    ...(nextStatus === 'rejected' && typeof rejectionReason === 'string' ? { rejectionReason } : {})
+  });
+  if (!updated) return res.status(400).json(formatResponse(false, 'Break already processed'));
+  await notifyHourBreakDecision(updated, requester).catch(console.error);
+  return res.status(200).json(formatResponse(true, `Break ${nextStatus}`, updated));
+};
 
 exports.deleteBreak = async (req, res) => {
-  try {
-    const { breakId } = req.params;
-    await HourBreak.findByIdAndDelete(breakId);
-    res.status(200).json(formatResponse(true, 'Break deleted'));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
+  const record = await HourBreak.findById(req.params.breakId);
+  if (!record || !ownsRequest(req.user, record)) return res.status(404).json(formatResponse(false, 'Break not found'));
+  if (record.status !== 'pending') return res.status(400).json(formatResponse(false, 'Processed breaks cannot be deleted'));
+  await HourBreak.findByIdAndDelete(record.id);
+  return res.status(200).json(formatResponse(true, 'Break deleted'));
 };
 
-// ==================== GET MY BREAKS ====================
-
 exports.getMyBreaks = async (req, res) => {
-  try {
-    const { userId } = req.params;
-    const breaks = await HourBreak.find({ userId: parseInt(userId) }).sort({ createdAt: -1 });
-    res.status(200).json(formatResponse(true, 'Breaks fetched', breaks));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+  if (String(req.params.userId) !== String(req.user.id)) {
+    return res.status(403).json(formatResponse(false, 'You can only view your own breaks here'));
   }
+  const breaks = await HourBreak.find().sort({ createdAt: -1 });
+  return res.status(200).json(formatResponse(true, 'Breaks fetched', breaks.filter(record => ownsRequest(req.user, record))));
 };

@@ -1,7 +1,9 @@
+import { FileText as IconFileText } from '../../Common/Icons';
+import { displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/PasswordResetRequests.jsx
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
-import { Bell, CheckCircle, XCircle, Clock, Eye, RefreshCw } from 'lucide-react';
+import { Bell, CheckCircle, XCircle, Clock, Eye, RefreshCw } from '../../Common/Icons';
 import { roleLabel } from '../../../utils/roleLabels';
 
 const PasswordResetRequests = ({ userRole }) => {
@@ -115,7 +117,7 @@ const PasswordResetRequests = ({ userRole }) => {
         </div>
         <button
           onClick={fetchData}
-          className="px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors flex items-center gap-2"
         >
           <RefreshCw className="w-4 h-4" /> Refresh
         </button>
@@ -168,9 +170,7 @@ const PasswordResetRequests = ({ userRole }) => {
         {requests.length === 0 ? (
           <div className="p-12 text-center">
             <div className="w-20 h-20 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-              <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-              </svg>
+              <IconFileText className="w-10 h-10 text-gray-400" />
             </div>
             <p className="text-gray-500 text-lg">No pending requests</p>
             <p className="text-sm text-gray-400 mt-1">All password reset requests have been processed</p>
@@ -211,7 +211,7 @@ const PasswordResetRequests = ({ userRole }) => {
                       </div>
                       <div>
                         <span className="text-gray-500">Requested:</span>
-                        <span className="ml-2 text-gray-900">{new Date(request.requestedAt).toLocaleString()}</span>
+                        <span className="ml-2 text-gray-900">{displayDateTime(request.requestedAt)}</span>
                       </div>
                     </div>
 
@@ -230,13 +230,13 @@ const PasswordResetRequests = ({ userRole }) => {
                         setSelectedRequest(request);
                         setShowModal(true);
                       }}
-                      className="px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
+                      className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-white bg-green-600 rounded-lg hover:bg-green-700 transition-colors"
                     >
                       Approve
                     </button>
                     <button
                       onClick={() => handleReject(request.id)}
-                      className="px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
+                      className="btn btn-sm btn-ghost px-4 py-2 text-sm font-medium text-white bg-red-600 rounded-lg hover:bg-red-700 transition-colors"
                     >
                       Reject
                     </button>
@@ -281,20 +281,20 @@ const PasswordResetRequests = ({ userRole }) => {
                   onChange={(e) => setComments(e.target.value)}
                   rows="3"
                   placeholder="Add any comments or instructions..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               </div>
               
               <div className="flex space-x-3">
                 <button
                   onClick={() => setShowModal(false)}
-                  className="flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
+                  className="btn btn-sm btn-ghost flex-1 px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={() => handleApprove(selectedRequest.id)}
-                  className="flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
+                  className="btn btn-sm btn-ghost flex-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700"
                 >
                   Approve & Send Password
                 </button>

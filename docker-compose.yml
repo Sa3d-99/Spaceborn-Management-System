@@ -1,36 +1,62 @@
 services:
   app:
-    build: .
+    init: true
+    build:
+      context: .
+      args:
+        REACT_APP_API_URL: ${REACT_APP_API_URL:-}
+        REACT_APP_DRIVE_FOLDER_ID: ${REACT_APP_DRIVE_FOLDER_ID:-}
+        REACT_APP_FRONTEND_URL: ${REACT_APP_FRONTEND_URL:-}
+        REACT_APP_GOOGLE_CLIENT_ID: ${REACT_APP_GOOGLE_CLIENT_ID:-}
+        REACT_APP_LOCKOUT_DURATION: ${REACT_APP_LOCKOUT_DURATION:-}
+        REACT_APP_MAX_LOGIN_ATTEMPTS: ${REACT_APP_MAX_LOGIN_ATTEMPTS:-}
+        REACT_APP_SESSION_TIMEOUT: ${REACT_APP_SESSION_TIMEOUT:-}
+        PUBLIC_REFRESH_THRESHOLD: ${REACT_APP_TOKEN_REFRESH_THRESHOLD:-}
+        PUBLIC_MOCK_MODE: ${REACT_APP_USE_MOCK_AUTH:-}
     ports:
       - "${APP_PORT:-5000}:5000"
     environment:
       NODE_ENV: production
       PORT: 5000
-      DATABASE_URL: postgres://${POSTGRES_USER:-spaceborn}:${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}@db:5432/${POSTGRES_DB:-spaceborn}
+      DATABASE_URL: postgres://db:5432/?sslmode=disable
+      PGDATABASE: ${POSTGRES_DB:-spaceborn}
+      PGUSER: ${POSTGRES_USER:-spaceborn}
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
       JWT_SECRET: ${JWT_SECRET:?Set JWT_SECRET in .env}
       JWT_EXPIRE: ${JWT_EXPIRE:-24h}
+      APP_URL: ${APP_URL:-http://localhost:5000}
+      RESEND_API_KEY: ${RESEND_API_KEY:-}
+      RESEND_FROM_EMAIL: ${RESEND_FROM_EMAIL:-}
+      SIGNUP_ADMIN_EMAIL: ${SIGNUP_ADMIN_EMAIL:-}
+      TRUST_PROXY_HOPS: ${TRUST_PROXY_HOPS:-0}
+      SEED_DEMO_DATA: ${SEED_DEMO_DATA:-false}
     depends_on:
       db:
         condition: service_healthy
     volumes:
       - app_uploads:/app/backend/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:5000/api/health').then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
     restart: unless-stopped
 
   db:
-    image: postgres:16-alpine
+    image: postgres:19.0-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-spaceborn}
       POSTGRES_USER: ${POSTGRES_USER:-spaceborn}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Set POSTGRES_PASSWORD in .env}
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres19_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      test: ["CMD-SHELL", "pg_isready -h 127.0.0.1 -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
 
 volumes:
-  postgres_data:
+  postgres19_data:
   app_uploads:

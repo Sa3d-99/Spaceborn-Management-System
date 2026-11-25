@@ -1,3 +1,5 @@
+import { AlertTriangle as IconAlertTriangle, Plus as IconPlus, Users as IconUsers, X as IconX } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/TeamsAndRoles.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -324,7 +326,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'long', day: 'numeric', year: 'numeric' });
   };
 
   // Group members by department
@@ -374,11 +376,9 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
         {canEditMembers() && (
           <button
             onClick={() => setShowAddMemberForm(!showAddMemberForm)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center space-x-2"
           >
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <IconPlus className="w-5 h-5" />
             <span>{showAddMemberForm ? 'Cancel' : 'Add Member'}</span>
           </button>
         )}
@@ -425,7 +425,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.name}
                   onChange={(e) => setFormData({...formData, name: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter full name"
                 />
               </div>
@@ -436,7 +436,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.email}
                   onChange={(e) => setFormData({...formData, email: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter email address"
                 />
               </div>
@@ -446,7 +446,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.department}
                   onChange={(e) => setFormData({...formData, department: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   <option value="">Select department</option>
                   {departmentsList.map(dept => (
@@ -461,7 +461,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.designation}
                   onChange={(e) => setFormData({...formData, designation: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="e.g., Software Engineer"
                 />
               </div>
@@ -471,7 +471,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   required
                   value={formData.role}
                   onChange={(e) => setFormData({...formData, role: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {roles.map(role => (
                     <option key={role} value={role}>{roleLabel(role)}</option>
@@ -483,7 +483,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                 <select
                   value={formData.status}
                   onChange={(e) => setFormData({...formData, status: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="select w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 >
                   {statuses.map(status => (
                     <option key={status} value={status}>{status}</option>
@@ -496,7 +496,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   type="tel"
                   value={formData.phone}
                   onChange={(e) => setFormData({...formData, phone: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                   placeholder="Enter phone number"
                 />
               </div>
@@ -506,7 +506,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                   type="date"
                   value={formData.joinDate}
                   onChange={(e) => setFormData({...formData, joinDate: e.target.value})}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
                 />
               </div>
             </div>
@@ -514,13 +514,13 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
               <button
                 type="button"
                 onClick={() => setShowAddMemberForm(false)}
-                className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
                 type="submit"
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
               >
                 Add Member
               </button>
@@ -537,12 +537,12 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
             placeholder="Search by name or department..." 
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="input px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           />
           <select 
             value={selectedDepartment}
             onChange={(e) => setSelectedDepartment(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">All Departments</option>
             {departmentsList.map(dept => (
@@ -552,7 +552,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
           <select 
             value={selectedRole}
             onChange={(e) => setSelectedRole(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">All Roles</option>
             {roles.map(role => (
@@ -562,7 +562,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
           <select 
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="select px-4 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
           >
             <option value="All">All Status</option>
             {statuses.map(status => (
@@ -576,15 +576,13 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
       {error && teamMembers.length === 0 ? (
         <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
           <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <IconAlertTriangle className="w-8 h-8 text-red-600" />
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Team Members</h3>
           <p className="text-gray-600 mb-4">{error}</p>
           <button 
             onClick={fetchTeamMembers}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
           >
             Try Again
           </button>
@@ -592,9 +590,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
       ) : teamMembers.length === 0 ? (
         /* Empty State */
         <div className="bg-white rounded-xl border border-gray-200 p-12 text-center">
-          <svg className="w-20 h-20 text-gray-300 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-          </svg>
+          <IconUsers className="w-20 h-20 text-gray-300 mx-auto mb-4" />
           <p className="text-gray-500 text-lg">No team members found</p>
           <p className="text-gray-400 text-sm mt-2">Try adjusting your filters or add a new member</p>
         </div>
@@ -602,7 +598,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
         /* Table View */
         <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MEMBER</th>
@@ -669,7 +665,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                 <h2 className="font-semibold text-gray-900">{department} · {members.length} MEMBERS</h2>
               </div>
               <div className="overflow-x-auto">
-                <table className="w-full">
+                <table className="table w-full">
                   <thead className="bg-gray-50 border-b border-gray-200">
                     <tr>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">MEMBER</th>
@@ -802,9 +798,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Member Details</h2>
                 <button onClick={() => setShowMemberModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IconX className="w-6 h-6" />
                 </button>
               </div>
               
@@ -856,13 +850,13 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <div className="flex justify-end space-x-3 pt-4 border-t">
                       <button
                         onClick={() => setIsEditing(true)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                        className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                       >
                         Edit Member
                       </button>
                       <button
                         onClick={() => deleteTeamMember(selectedMember.id)}
-                        className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+                        className="btn btn-sm btn-ghost px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
                       >
                         Delete Member
                       </button>
@@ -877,7 +871,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       type="text"
                       value={selectedMember.name}
                       onChange={(e) => setSelectedMember({...selectedMember, name: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="input w-full px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
                   <div>
@@ -886,7 +880,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       type="email"
                       value={selectedMember.email}
                       onChange={(e) => setSelectedMember({...selectedMember, email: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="input w-full px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
                   <div>
@@ -894,7 +888,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <select
                       value={selectedMember.department}
                       onChange={(e) => setSelectedMember({...selectedMember, department: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="select w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       {departmentsList.map(dept => (
                         <option key={dept} value={dept}>{dept}</option>
@@ -907,7 +901,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       type="text"
                       value={selectedMember.designation}
                       onChange={(e) => setSelectedMember({...selectedMember, designation: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="input w-full px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
                   <div>
@@ -915,7 +909,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <select
                       value={selectedMember.role}
                       onChange={(e) => setSelectedMember({...selectedMember, role: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="select w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       {roles.map(role => (
                         <option key={role} value={role}>{roleLabel(role)}</option>
@@ -927,7 +921,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                     <select
                       value={selectedMember.status}
                       onChange={(e) => setSelectedMember({...selectedMember, status: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="select w-full px-3 py-2 border border-gray-300 rounded-lg"
                     >
                       {statuses.map(status => (
                         <option key={status} value={status}>{status}</option>
@@ -940,19 +934,19 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       type="tel"
                       value={selectedMember.phone}
                       onChange={(e) => setSelectedMember({...selectedMember, phone: e.target.value})}
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg"
+                      className="input w-full px-3 py-2 border border-gray-300 rounded-lg"
                     />
                   </div>
                   <div className="flex justify-end space-x-3 pt-4">
                     <button
                       onClick={() => setIsEditing(false)}
-                      className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                      className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                     >
                       Cancel
                     </button>
                     <button
                       onClick={updateTeamMember}
-                      className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
+                      className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700"
                     >
                       Save Changes
                     </button>

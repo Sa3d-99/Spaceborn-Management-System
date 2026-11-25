@@ -1,3 +1,4 @@
+import { businessDate, displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/ActivityMonitor.jsx
 import React, { useState, useEffect } from 'react';
 import * as XLSX from 'xlsx';
@@ -214,7 +215,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
       'Department': activity.department || 'N/A',
       'Action': activity.action,
       'Details': activity.details,
-      'Time': new Date(activity.timestamp).toLocaleString(),
+      'Time': displayDateTime(activity.timestamp),
       'Relative Time': formatRelativeTime(activity.timestamp)
     }));
 
@@ -235,7 +236,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, 'Activity Report');
     
-    const fileName = `activity-report-${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `activity-report-${businessDate()}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -248,7 +249,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
       a.department || 'N/A',
       a.action,
       `"${a.details?.replace(/"/g, '""') || ''}"`,
-      new Date(a.timestamp).toLocaleString(),
+      displayDateTime(a.timestamp),
       formatRelativeTime(a.timestamp)
     ]);
     const csv = [headers, ...csvData].map(row => row.join(',')).join('\n');
@@ -256,7 +257,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `activity-report-${new Date().toISOString().split('T')[0]}.csv`;
+    a.download = `activity-report-${businessDate()}.csv`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -364,7 +365,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
             <select
               value={filter}
               onChange={(e) => setFilter(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             >
               <option value="all">All Activities</option>
               <option value="report">Reports</option>
@@ -381,7 +382,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             >
               <option value="today">Today</option>
               <option value="week">This Week</option>
@@ -397,7 +398,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
               placeholder="Search by name, action..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
+              className="input w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-black"
             />
           </div>
           
@@ -408,20 +409,20 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
                 setDateRange('week');
                 setSearchTerm('');
               }}
-              className="flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
+              className="btn btn-sm btn-ghost flex-1 px-3 py-2 text-sm text-gray-600 border border-gray-200 rounded-lg hover:bg-gray-50"
             >
               Clear Filters
             </button>
             <button
               onClick={exportToExcel}
-              className="px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-3 py-2 bg-green-600 text-white rounded-lg text-sm hover:bg-green-700 flex items-center gap-2"
               title="Export to Excel"
             >
               📊 Excel
             </button>
             <button
               onClick={exportToCSV}
-              className="px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-3 py-2 bg-gray-600 text-white rounded-lg text-sm hover:bg-gray-700 flex items-center gap-2"
               title="Export to CSV"
             >
               📄 CSV
@@ -438,7 +439,7 @@ const ActivityMonitor = ({ userRole = 'CEO' }) => {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Activities</h3>
           <p className="text-gray-600 mb-4">{error}</p>
-          <button onClick={fetchActivities} className="px-4 py-2 bg-black text-white rounded-lg">Try Again</button>
+          <button onClick={fetchActivities} className="btn btn-sm btn-ghost px-4 py-2 bg-black text-white rounded-lg">Try Again</button>
         </div>
       ) : filteredActivities.length === 0 ? (
         <div className="bg-white rounded-lg border p-12 text-center">

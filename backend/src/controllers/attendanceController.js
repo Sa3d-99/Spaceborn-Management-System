@@ -1,5 +1,7 @@
 // controllers/attendanceController.js
 const Attendance = require('../models/Attendance');
+const Meeting = require('../models/Meeting');
+const { businessDate, businessClock, businessInstant } = require('../utils/businessTime');
 const Leave = require('../models/Leave');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
@@ -9,35 +11,23 @@ const { formatResponse } = require('../utils/helpers');
 // @access  Private
 exports.autoMarkAttendance = async (req, res) => {
   try {
-    const { userId, userName, employeeId, department, role } = req.body;
-    const today = new Date().toISOString().split('T')[0];
+    const { id: userId, name: userName, employeeId, department, role } = req.user;
     const now = new Date();
-    const currentTime = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
-    
-    // Check if already marked today
-    let attendance = await Attendance.findOne({ userId, date: today });
-    
-    if (attendance) {
-      // Update check-out if not set
-      if (!attendance.checkOut) {
-        attendance.checkOut = currentTime;
-        attendance.checkOutTime = now;
-        const hours = (now - attendance.checkInTime) / (1000 * 60 * 60);
-        attendance.hoursWorked = Math.round(hours * 100) / 100;
-        await attendance.save();
-      }
-      return res.status(200).json(formatResponse(true, 'Attendance updated', attendance));
-    }
-    
-    // Determine status based on login time
-    const loginHour = now.getHours();
-    let status = 'present';
-    if (loginHour >= 9) {
-      status = 'late';
-    }
-    
-    // Create new attendance record
-    attendance = await Attendance.create({
+    const today = businessDate(now);
+    const dayAttendance = await Attendance.findOne({ userId: String(userId), date: today });
+    if (dayAttendance) return res.status(200).json(formatResponse(true, 'Attendance already marked', dayAttendance));
+
+    const meetings = await Meeting.find({
+      date: today,
+      department: { $in: [department, 'All'] },
+      status: { $nin: ['cancelled', 'canceled'] }
+    });
+    const starts = meetings.map(meeting => businessInstant(meeting.date, meeting.time).getTime()).filter(Number.isFinite);
+    const late = starts.length > 0 && now.getTime() > Math.min(...starts) + 5 * 60_000;
+    const currentTime = businessClock(now);
+    const status = late ? 'late' : 'present';
+
+    const attendance = await Attendance.create({
       userId: String(userId),
       userName,
       employeeId,
@@ -55,6 +45,24 @@ exports.autoMarkAttendance = async (req, res) => {
     console.error('Auto-mark attendance error:', error);
     res.status(500).json(formatResponse(false, error.message));
   }
+};
+
+exports.clockOut = async (req, res) => {
+  const now = new Date();
+  const yesterday = businessDate(new Date(now.getTime() - 86_400_000));
+  const records = await Attendance.find({
+    userId: String(req.user.id),
+    date: { $in: [businessDate(now), yesterday] }
+  }).sort({ date: -1 });
+  const attendance = records.find(record => record.checkInTime && !record.checkOut);
+  if (!attendance) return res.json(formatResponse(true, 'No open attendance record'));
+
+  const minutes = Math.round((now - new Date(attendance.checkInTime)) / 60_000);
+  attendance.checkOut = businessClock(now);
+  attendance.checkOutTime = now;
+  attendance.hoursWorked = Math.round(minutes / 60 * 100) / 100;
+  await attendance.save();
+  return res.json(formatResponse(true, 'Attendance checked out', attendance));
 };
 
 // @desc    Get attendance records
@@ -91,7 +99,7 @@ exports.getAttendance = async (req, res) => {
 exports.getStats = async (req, res) => {
   try {
     const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || businessDate();
     
     const records = await Attendance.find({ date: targetDate });
     
@@ -117,7 +125,7 @@ exports.getStats = async (req, res) => {
 exports.getDepartmentStats = async (req, res) => {
   try {
     const { date } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || businessDate();
     
     const records = await Attendance.find({ date: targetDate });
     
@@ -156,7 +164,7 @@ exports.getDepartmentStats = async (req, res) => {
 exports.markAttendance = async (req, res) => {
   try {
     const { userId, userName, employeeId, department, role, date, status, checkInTime, checkOutTime, notes } = req.body;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || businessDate();
     
     let attendance = await Attendance.findOne({ userId, date: targetDate });
     
@@ -165,17 +173,17 @@ exports.markAttendance = async (req, res) => {
       if (status) attendance.status = status;
       if (checkInTime) {
         attendance.checkIn = checkInTime;
-        attendance.checkInTime = new Date(`${targetDate}T${checkInTime}`);
+        attendance.checkInTime = businessInstant(targetDate, checkInTime);
       }
       if (checkOutTime) {
         attendance.checkOut = checkOutTime;
-        attendance.checkOutTime = new Date(`${targetDate}T${checkOutTime}`);
+        attendance.checkOutTime = businessInstant(targetDate, checkOutTime);
       }
       if (notes) attendance.notes = notes;
       
       if (checkInTime && checkOutTime) {
-        const start = new Date(`${targetDate}T${checkInTime}`);
-        const end = new Date(`${targetDate}T${checkOutTime}`);
+        const start = businessInstant(targetDate, checkInTime);
+        const end = businessInstant(targetDate, checkOutTime);
         attendance.hoursWorked = Math.round((end - start) / (1000 * 60 * 60) * 100) / 100;
       }
       
@@ -193,9 +201,9 @@ exports.markAttendance = async (req, res) => {
       date: targetDate,
       status: status || 'present',
       checkIn: checkInTime || '',
-      checkInTime: checkInTime ? new Date(`${targetDate}T${checkInTime}`) : null,
+      checkInTime: checkInTime ? businessInstant(targetDate, checkInTime) : null,
       checkOut: checkOutTime || '',
-      checkOutTime: checkOutTime ? new Date(`${targetDate}T${checkOutTime}`) : null,
+      checkOutTime: checkOutTime ? businessInstant(targetDate, checkOutTime) : null,
       notes,
       isAutoMarked: false
     });
@@ -226,7 +234,7 @@ exports.markLeaveAbsent = async (req, res) => {
       const start = new Date(startDate);
       const end = new Date(endDate);
 
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
+      for (let d = new Date(start); d <= end; d.setUTCDate(d.getUTCDate() + 1)) {
         const dateStr = d.toISOString().split('T')[0];
 
         // Check if already marked
@@ -266,7 +274,7 @@ exports.markLeaveAbsent = async (req, res) => {
 exports.getRosterAttendance = async (req, res) => {
   try {
     const { date, department } = req.query;
-    const targetDate = date || new Date().toISOString().split('T')[0];
+    const targetDate = date || businessDate();
 
     const user = req.user;
     const viewRole = user?.role;
@@ -282,7 +290,7 @@ exports.getRosterAttendance = async (req, res) => {
     const usersQuery = { role: { $in: ['CEO', 'COO', 'Manager', 'Co-Head', 'CO Head', 'Team Lead', 'Member', 'HR'] } };
     if (scopeDepartment) usersQuery.department = scopeDepartment;
 
-    const employees = await User.find(usersQuery).select('employeeId firstName lastName fullName role department');
+    const employees = await User.find({ ...usersQuery, isActive: { $ne: false } }).select('employeeId firstName lastName fullName role department');
 
     // Some schemas may not have 'fullName' consistently; normalize below.
 
@@ -358,7 +366,9 @@ exports.getRosterAttendance = async (req, res) => {
           role: attendance.role,
           status: attendance.status,
           checkIn: attendance.checkIn,
+          checkInTime: attendance.checkInTime,
           checkOut: attendance.checkOut,
+          checkOutTime: attendance.checkOutTime,
           hoursWorked: attendance.hoursWorked || 0
         };
       }

@@ -1,6 +1,7 @@
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/DepartmentOverview.jsx
 import React, { useState, useEffect } from 'react';
-import { Building2, Users, TrendingUp, DollarSign, MoreVertical, ChevronDown, ChevronUp, Target, Clock, Award, AlertCircle } from 'lucide-react';
+import { Building2, Users, TrendingUp, DollarSign, MoreVertical, ChevronDown, ChevronUp, Target, Clock, Award, AlertCircle } from '../../Common/Icons';
 import authService from '../../../services/authService';
 
 const DepartmentOverview = ({ userRole = 'CEO' }) => {
@@ -204,7 +205,7 @@ const DepartmentOverview = ({ userRole = 'CEO' }) => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-US', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const getInitials = (name) => {
@@ -227,7 +228,7 @@ const DepartmentOverview = ({ userRole = 'CEO' }) => {
         </div>
         <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Department Data</h3>
         <p className="text-gray-600 mb-4">{error}</p>
-        <button onClick={fetchDepartmentData} className="px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
+        <button onClick={fetchDepartmentData} className="btn btn-sm btn-ghost px-4 py-2 bg-blue-600 text-white rounded-lg">Try Again</button>
       </div>
     );
   }
@@ -255,7 +256,7 @@ const DepartmentOverview = ({ userRole = 'CEO' }) => {
           <div className="flex items-center space-x-3">
             <select 
               onChange={(e) => setSelectedMetric(e.target.value)}
-              className="text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
+              className="select text-sm border border-gray-200 rounded-lg px-3 py-1.5 focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
               value={selectedMetric}
             >
               {Object.entries(metrics).map(([key, val]) => (
@@ -432,10 +433,10 @@ const DepartmentOverview = ({ userRole = 'CEO' }) => {
 
                   {/* Quick Actions */}
                   <div className="flex justify-end space-x-3 mt-4 pt-3 border-t border-gray-200">
-                    <button className="text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-100">
+                    <button className="btn btn-sm btn-ghost text-sm text-gray-600 hover:text-gray-800 px-3 py-1 rounded-lg hover:bg-gray-100">
                       View Team
                     </button>
-                    <button className="text-sm text-blue-600 hover:text-blue-700 px-3 py-1 rounded-lg hover:bg-blue-50">
+                    <button className="btn btn-sm btn-ghost text-sm text-blue-600 hover:text-blue-700 px-3 py-1 rounded-lg hover:bg-blue-50">
                       Department Report →
                     </button>
                   </div>

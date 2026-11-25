@@ -1,9 +1,10 @@
 // seed.js - Seeds initial data into PostgreSQL (PGlite / Render Postgres)
-require('dotenv').config();
+require('./src/config/env');
 const connectDB = require('./src/config/db');
 const User = require('./src/models/User');
 const Task = require('./src/models/Task');
 const ExecutiveDecision = require('./src/models/ExecutiveDecision');
+const { businessDate } = require('./src/utils/businessTime');
 
 const INITIAL_USERS = [
   {
@@ -121,7 +122,7 @@ const INITIAL_TASKS = [
     department: 'Core Systems',
     priority: 'high',
     status: 'In progress',
-    dueDate: '2026-11-15',
+    dueInDays: 5,
     progress: 60
   },
   {
@@ -131,7 +132,7 @@ const INITIAL_TASKS = [
     department: 'Core Systems',
     priority: 'medium',
     status: 'Pending',
-    dueDate: '2026-11-20',
+    dueInDays: 10,
     progress: 25
   }
 ];
@@ -157,8 +158,9 @@ async function runSeed() {
   console.log(`✅ Seeded ${INITIAL_USERS.length} users`);
 
   await Task.deleteMany({});
-  for (const task of INITIAL_TASKS) {
-    await Task.create(task);
+  for (const { dueInDays, ...task } of INITIAL_TASKS) {
+    const dueDate = businessDate(new Date(Date.now() + dueInDays * 86_400_000));
+    await Task.create({ ...task, dueDate });
   }
   console.log(`✅ Seeded ${INITIAL_TASKS.length} sample tasks`);
 

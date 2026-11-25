@@ -1,3 +1,4 @@
+const { businessDate } = require('../utils/businessTime');
 const Meeting = require('../models/Meeting');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
@@ -23,7 +24,7 @@ exports.createMeeting = async (req, res) => {
       duration: duration || '1 hour',
       meetingLink: meetingLink || '',
       description: description || '',
-      createdBy: `${req.user.firstName} ${req.user.lastName}`,
+      createdBy: req.user.name,
       createdById: req.user._id,
       status: 'upcoming',
       attendees: []
@@ -44,7 +45,7 @@ exports.createMeeting = async (req, res) => {
 exports.getAllMeetings = async (req, res) => {
   try {
     const { filter, department } = req.query;
-    const today = new Date().toISOString().split('T')[0];
+    const today = businessDate();
 
     let query = {};
 
@@ -81,7 +82,7 @@ exports.getMyDepartmentMeetings = async (req, res) => {
   try {
     const user = req.user;
     const userDepartment = user.department;
-    const today = new Date().toISOString().split('T')[0];
+    const today = businessDate();
 
     const meetings = await Meeting.find({
       $or: [

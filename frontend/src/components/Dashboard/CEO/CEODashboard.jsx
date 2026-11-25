@@ -1,3 +1,4 @@
+import { Folder as IconFolder } from '../../Common/Icons';
 import React, { useEffect, useState } from 'react';
 import authService from '../../../services/authService';
 import GoogleDriveViewer from '../../Common/GoogleDriveViewer';
@@ -106,15 +107,13 @@ const CEODashboard = ({ user, onLogout }) => {
   return (
     <div className="p-6 max-w-7xl mx-auto">
       {/* Dashboard Title with Drive Button */}
-      <div className="flex justify-between items-center mb-6">
+      <div className="flex flex-wrap justify-between items-center gap-3 mb-6">
         <h1 className="text-2xl font-bold text-gray-900">Dashboard</h1>
         <button
           onClick={() => setShowDriveViewer(!showDriveViewer)}
-          className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm"
+          className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 text-sm"
         >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 19a2 2 0 01-2-2V7a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1M5 19h14a2 2 0 002-2v-5a2 2 0 00-2-2H9m-4 0h.01M9 14h6" />
-          </svg>
+          <IconFolder className="w-4 h-4" />
           <span>{showDriveViewer ? 'Hide Documents' : 'Employee Documents'}</span>
         </button>
       </div>
@@ -139,7 +138,7 @@ const CEODashboard = ({ user, onLogout }) => {
       </div>
 
       {/* Stats Row 1 */}
-      <div className="grid grid-cols-4 gap-5 mb-8">
+      <div className="grid grid-cols-2 gap-3 mb-8 xl:grid-cols-4">
         <div className="bg-white rounded-xl border p-5">
           <div className="text-sm font-medium text-gray-500 mb-1">ACTIVE PROJECTS</div>
           <div className="text-3xl font-bold text-gray-900">{stats.activeProjects}</div>
@@ -163,7 +162,7 @@ const CEODashboard = ({ user, onLogout }) => {
       </div>
 
       {/* Attention Required & Department Progress */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 xl:grid-cols-2">
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="px-5 py-3 bg-red-50 border-b">
             <h3 className="font-semibold text-gray-900">Attention required</h3>
@@ -217,7 +216,7 @@ const CEODashboard = ({ user, onLogout }) => {
       </div>
 
       {/* Team Headcount & Top Performers */}
-      <div className="grid grid-cols-2 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 xl:grid-cols-2">
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="px-5 py-3 border-b">
             <h3 className="font-semibold text-gray-900">Team headcount & health</h3>
@@ -264,7 +263,7 @@ const CEODashboard = ({ user, onLogout }) => {
       </div>
 
       {/* 3 Column Section */}
-      <div className="grid grid-cols-3 gap-6 mb-8">
+      <div className="grid grid-cols-1 gap-6 mb-8 lg:grid-cols-3">
         <div className="bg-white rounded-xl border overflow-hidden">
           <div className="px-5 py-3 border-b bg-gray-50">
             <h3 className="font-semibold text-gray-900 text-sm">Upcoming meetings</h3>

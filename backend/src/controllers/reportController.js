@@ -1,3 +1,4 @@
+const { businessDate } = require('../utils/businessTime');
 // controllers/reportController.js
 const Report = require('../models/Report');
 const { formatResponse } = require('../utils/helpers');
@@ -64,7 +65,7 @@ exports.submitReport = async (req, res) => {
 // @access  Private
 exports.getTodayReport = async (req, res) => {
   try {
-    const today = new Date().toISOString().split('T')[0];
+    const today = businessDate();
     const userIdStr = String(req.params.userId);
     const report = await Report.findOne({ userId: userIdStr, date: today });
 

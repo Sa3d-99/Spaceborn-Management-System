@@ -1,3 +1,4 @@
+import { Plus as IconPlus } from '../Common/Icons';
 import React from 'react';
 import { roleLabel } from '../../utils/roleLabels';
 
@@ -17,9 +18,7 @@ const MemberSidebar = ({ activeMenu, setActiveMenu, user }) => {
       <div className="p-6 border-b border-gray-200">
         <div className="flex items-center space-x-2">
           <div className="w-8 h-8 bg-gradient-to-br from-cyan-600 to-blue-600 rounded-lg flex items-center justify-center">
-            <svg className="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
+            <IconPlus className="w-5 h-5 text-white" />
           </div>
           <span className="font-bold text-xl bg-gradient-to-r from-cyan-600 to-blue-600 bg-clip-text text-transparent">Space Born</span>
         </div>

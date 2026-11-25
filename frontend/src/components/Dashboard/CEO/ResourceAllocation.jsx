@@ -1,3 +1,5 @@
+import { displayDate } from '../../../utils/timeZone';
+import { displayDateTime } from '../../../utils/timeZone';
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 
@@ -19,7 +21,7 @@ const ResourceAllocation = ({ userRole = 'CEO' }) => {
     if (!value) return 'N/A';
     const d = new Date(value);
     if (isNaN(d.getTime())) return value;
-    return d.toLocaleDateString('en-IN');
+    return displayDate(value);
   };
 
   const fetchResourceRequests = async () => {
@@ -354,13 +356,13 @@ const ResourceAllocation = ({ userRole = 'CEO' }) => {
                             <div className="flex gap-2 ml-4">
                               <button
                                 onClick={() => handleApproveRequest(request._id ?? request.id)}
-                                className="px-3 py-1.5 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 transition-colors"
+                                className="btn btn-sm btn-ghost px-3 py-1.5 bg-emerald-600 text-white rounded-md text-sm hover:bg-emerald-700 transition-colors"
                               >
                                 Accept
                               </button>
                               <button
                                 onClick={() => handleRejectRequest(request._id ?? request.id)}
-                                className="px-3 py-1.5 bg-rose-600 text-white rounded-md text-sm hover:bg-rose-700 transition-colors"
+                                className="btn btn-sm btn-ghost px-3 py-1.5 bg-rose-600 text-white rounded-md text-sm hover:bg-rose-700 transition-colors"
                               >
                                 Reject
                               </button>
@@ -440,7 +442,7 @@ const ResourceAllocation = ({ userRole = 'CEO' }) => {
                       </p>
                       {track.details && <p className="text-xs text-gray-400 mt-1">{track.details}</p>}
                       {track.timestamp && (
-                        <p className="text-xs text-gray-400 mt-1">{new Date(track.timestamp).toLocaleString('en-IN')}</p>
+                        <p className="text-xs text-gray-400 mt-1">{displayDateTime(track.timestamp, 'en-IN')}</p>
                       )}
                     </div>
                   </div>

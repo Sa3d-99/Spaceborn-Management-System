@@ -1,22 +1,30 @@
+const { setTimeout: wait } = require('node:timers/promises');
 const User = require('../models/User');
-const PasswordResetRequest = require('../models/PasswordResetRequest');
+const { effectiveRole, canAssignEmployeeRole } = require('../utils/terminationPermissions');
 const { formatResponse } = require('../utils/helpers');
-const { sendPasswordResetEmail } = require('../services/emailService');
-const {
-  notifyPasswordResetRequested,
-  notifyPasswordResetDecision
-} = require('../utils/notificationDispatcher');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
-const crypto = require('crypto');
+const { passwordError } = require('../utils/passwords');
+const { emailSettings } = require('../services/emailService');
+const { emailResetLink, isResetToken, isResetLinkValid, redeemResetLink } = require('../services/passwordResetService');
 
 // Register new user
 exports.register = async (req, res) => {
   try {
-    const { email, password, name, role, department, employeeId, phone, joinDate, designation } = req.body;
+    const { email, password, name, role, department, employeeId, phone, joinDate, designation } = req.body || {};
+    const accountRole = effectiveRole({ role: role || 'Member', designation });
     
+    const policyError = passwordError(password);
+    if (policyError) return res.status(400).json(formatResponse(false, policyError));
+    if (typeof name !== 'string' || !name.trim() || typeof email !== 'string' || typeof employeeId !== 'string') {
+      return res.status(400).json(formatResponse(false, 'Name, email and employee ID are required'));
+    }
+    if (!canAssignEmployeeRole(req.user.role, accountRole)) {
+      return res.status(403).json(formatResponse(false, 'You do not have permission to assign this role'));
+    }
+
     // Check if user exists
-    const existingUser = await User.findOne({ $or: [{ email }, { employeeId }] });
+    const normalizedEmail = email.trim().toLowerCase();
+    const normalizedId = employeeId.trim().toUpperCase();
+    const existingUser = await User.findOne({ $or: [{ email: normalizedEmail }, { employeeId: normalizedId }] });
     if (existingUser) {
       return res.status(400).json(formatResponse(false, 'User already exists'));
     }
@@ -27,13 +35,13 @@ exports.register = async (req, res) => {
     const lastName = nameParts.slice(1).join(' ') || firstName;
     
     const user = await User.create({
-      email,
+      email: normalizedEmail,
       password,
       firstName,
       lastName,
-      role: role || 'Member',
+      role: accountRole,
       department: department || 'Core Systems',
-      employeeId,
+      employeeId: normalizedId,
       phone,
       joinDate,
       designation,
@@ -50,7 +58,8 @@ exports.register = async (req, res) => {
         employeeId: user.employeeId,
         name: user.fullName,
         email: user.email,
-        role: user.role,
+        role: effectiveRole(user),
+        timeZone: user.timeZone,
         department: user.department
       },
       token
@@ -63,14 +72,16 @@ exports.register = async (req, res) => {
 // Login
 exports.login = async (req, res) => {
   try {
-    const { employeeId, password } = req.body;
+    const { employeeId, password } = req.body || {};
     
-    if (!employeeId || !password) {
-      return res.status(400).json(formatResponse(false, 'Please provide employee ID and password'));
+    if (typeof employeeId !== 'string' || !employeeId.trim() || typeof password !== 'string' || !password) {
+      return res.status(400).json(formatResponse(false, 'Please provide an employee ID or email and a password'));
     }
     
-    const user = await User.findOne({ employeeId }).select('+password');
-    if (!user) {
+    const identifier = employeeId.trim();
+    const lookup = identifier.includes('@') ? { email: identifier.toLowerCase() } : { employeeId: identifier.toUpperCase() };
+    const user = await User.findOne(lookup).select('+password');
+    if (!user || user.isActive === false) {
       return res.status(401).json(formatResponse(false, 'Invalid credentials'));
     }
     
@@ -91,7 +102,8 @@ exports.login = async (req, res) => {
         employeeId: user.employeeId,
         name: user.fullName,
         email: user.email,
-        role: user.role,
+        role: effectiveRole(user),
+        timeZone: user.timeZone,
         department: user.department
       },
       token
@@ -130,7 +142,8 @@ exports.getMe = async (req, res) => {
       employeeId: user.employeeId,
       name: user.fullName || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
       email: user.email,
-      role: user.role,
+      role: effectiveRole(user),
+      timeZone: user.timeZone,
       department: user.department,
       phone: user.phone,
       joinDate: user.joinDate,
@@ -143,272 +156,90 @@ exports.getMe = async (req, res) => {
   }
 };
 
-const getUserName = (user) =>
-  user.fullName || [user.firstName, user.lastName].filter(Boolean).join(' ').trim();
-
-const toResetRequestDto = (request) => ({
-  id: String(request._id),
-  _id: request._id,
-  employeeId: request.employeeId,
-  employeeName: request.employeeName,
-  employeeEmail: request.employeeEmail,
-  department: request.department,
-  role: request.role,
-  reason: request.reason,
-  status: request.status,
-  requestedAt: request.requestedAt,
-  approvedBy: request.approvedByName,
-  approvedAt: request.approvedAt,
-  rejectedBy: request.rejectedByName,
-  rejectedAt: request.rejectedAt,
-  comments: request.comments,
-  rejectionReason: request.rejectionReason,
-  emailStatus: request.emailStatus,
-  emailError: request.emailError
-});
-
-const generateTemporaryPassword = () => {
-  const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%';
-  return Array.from({ length: 12 }, () => alphabet[crypto.randomInt(alphabet.length)]).join('');
-};
-
-// Public: employee requests a manager/COO password reset.
 exports.requestPasswordReset = async (req, res) => {
+  const employeeId = typeof req.body?.employeeId === 'string' ? req.body.employeeId.trim() : '';
+  if (!employeeId || employeeId.length > (employeeId.includes('@') ? 254 : 64)) {
+    return res.status(400).json(formatResponse(false, 'Enter a valid employee ID or email.'));
+  }
+
+  const sender = emailSettings();
+  if (!sender) {
+    return res.status(503).json(formatResponse(false, 'Reset email could not be sent right now. Try again later.'));
+  }
+
+  // A common response window covers the provider timeout and obscures account lookup timing.
+  const responseDelay = wait(2750);
   try {
-    const employeeId = String(req.body.employeeId || '').trim().toUpperCase();
-    const reason = String(req.body.reason || '').trim();
-
-    if (!employeeId) {
-      return res.status(400).json({ success: false, message: 'Employee ID is required' });
-    }
-
-    const user = await User.findOne({ employeeId, isActive: true }).select('-password');
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Employee ID not found' });
-    }
-
-    const existingRequest = await PasswordResetRequest.findOne({ employeeId, status: 'pending' });
-    if (existingRequest) {
-      return res.status(409).json({
-        success: false,
-        message: 'You already have a pending password reset request.'
-      });
-    }
-
-    const request = await PasswordResetRequest.create({
-      employee: user._id,
-      employeeId: user.employeeId,
-      employeeName: getUserName(user),
-      employeeEmail: user.email,
-      department: user.department || '',
-      role: user.role || '',
-      reason
-    });
-
-    await notifyPasswordResetRequested(request).catch((error) => {
-      console.error('Password reset notification error:', error.message);
-    });
-
-    res.status(201).json({
-      success: true,
-      message: 'Password reset request submitted. COO and Manager users have been notified.',
-      requestId: String(request._id),
-      data: toResetRequestDto(request)
-    });
+    await emailResetLink(employeeId, sender);
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to submit reset request' });
+    console.error('Password reset request failed:', error.message);
+  }
+  await responseDelay;
+  return res.status(202).json(formatResponse(true, 'If the account can be reset, a link will be sent to its registered email.'));
+};
+
+function invalidResetLink(res) {
+  return res.status(400).json({
+    ...formatResponse(false, 'This link is invalid, expired, or already used. Request a new link.'),
+    error: 'INVALID_RESET_LINK'
+  });
+}
+
+exports.validatePasswordReset = async (req, res) => {
+  if (!await isResetLinkValid(req.body?.token)) return invalidResetLink(res);
+  return res.json(formatResponse(true, 'Reset link is valid.'));
+};
+
+exports.resetPassword = async (req, res) => {
+  const { token, newPassword } = req.body || {};
+  if (!isResetToken(token)) return invalidResetLink(res);
+
+  const policyError = passwordError(newPassword);
+  if (policyError) return res.status(400).json(formatResponse(false, policyError));
+
+  try {
+    if (!await redeemResetLink(token, newPassword)) return invalidResetLink(res);
+    return res.json(formatResponse(true, 'Password updated. Sign in with your new password.'));
+  } catch (error) {
+    console.error('Password reset failed:', error.message);
+    return res.status(500).json(formatResponse(false, 'Password reset failed. Please try again.'));
   }
 };
 
-exports.checkPendingPasswordReset = async (req, res) => {
-  try {
-    const employeeId = String(req.query.employeeId || '').trim().toUpperCase();
-    if (!employeeId) {
-      return res.json({ success: true, hasPending: false });
-    }
-
-    const hasPending = await PasswordResetRequest.exists({ employeeId, status: 'pending' });
-    res.json({ success: true, hasPending: Boolean(hasPending) });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to check reset request' });
+exports.changePassword = async (req, res) => {
+  const { currentPassword, newPassword } = req.body || {};
+  const policyError = passwordError(newPassword);
+  if (policyError) return res.status(400).json(formatResponse(false, policyError));
+  if (currentPassword === newPassword) {
+    return res.status(400).json(formatResponse(false, 'Choose a different password.'));
   }
-};
 
-exports.getPendingPasswordResetRequests = async (req, res) => {
   try {
-    const requests = await PasswordResetRequest.find({ status: 'pending' }).sort({ requestedAt: -1 });
-    const data = requests.map(toResetRequestDto);
-    res.json({ success: true, data, requests: data });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to fetch reset requests' });
-  }
-};
-
-exports.getPasswordResetStats = async (req, res) => {
-  try {
-    const startOfToday = new Date();
-    startOfToday.setHours(0, 0, 0, 0);
-
-    const startOfMonth = new Date();
-    startOfMonth.setDate(1);
-    startOfMonth.setHours(0, 0, 0, 0);
-
-    const [pending, approvedToday, totalMonth] = await Promise.all([
-      PasswordResetRequest.countDocuments({ status: 'pending' }),
-      PasswordResetRequest.countDocuments({ status: 'approved', approvedAt: { $gte: startOfToday } }),
-      PasswordResetRequest.countDocuments({ requestedAt: { $gte: startOfMonth } })
-    ]);
-
-    res.json({ success: true, pending, approvedToday, totalMonth, data: { pending, approvedToday, totalMonth } });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to fetch reset stats' });
-  }
-};
-
-exports.approvePasswordResetRequest = async (req, res) => {
-  try {
-    const request = await PasswordResetRequest.findById(req.params.id);
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Password reset request not found' });
+    const user = await User.findById(req.user.id);
+    if (!user || !await user.comparePassword(currentPassword)) {
+      return res.status(401).json(formatResponse(false, 'Current password is incorrect.'));
     }
-    if (request.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'Request has already been processed' });
-    }
-
-    const user = await User.findOne({ employeeId: request.employeeId });
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Employee no longer exists' });
-    }
-
-    const temporaryPassword = generateTemporaryPassword();
-    user.password = temporaryPassword;
+    user.password = newPassword;
     await user.save();
-
-    const comments = String(req.body.comments || '').trim();
-    let emailResult = { sent: false, skipped: true, reason: 'Email was not attempted' };
-    try {
-      emailResult = await sendPasswordResetEmail({
-        to: request.employeeEmail,
-        name: request.employeeName,
-        employeeId: request.employeeId,
-        temporaryPassword,
-        comments
-      });
-      request.emailStatus = emailResult.sent ? 'sent' : 'skipped';
-      request.emailError = emailResult.reason || '';
-    } catch (emailError) {
-      request.emailStatus = 'failed';
-      request.emailError = emailError.message || 'Email failed';
-      console.error('Password reset email error:', emailError.message);
-    }
-
-    request.status = 'approved';
-    request.approvedBy = req.user._id;
-    request.approvedByName = req.user.name;
-    request.approvedAt = new Date();
-    request.comments = comments;
-    await request.save();
-
-    await notifyPasswordResetDecision(request, 'approved').catch((error) => {
-      console.error('Password reset decision notification error:', error.message);
-    });
-
-    const emailMessage = request.emailStatus === 'sent'
-      ? 'A temporary password has been emailed to the employee.'
-      : 'The password was reset, but SMTP email is not configured or delivery failed. Check backend logs for the temporary password.';
-
-    if (request.emailStatus !== 'sent') {
-      console.log(`[password reset] Temporary password for ${request.employeeId}: ${temporaryPassword}`);
-    }
-
-    res.json({
-      success: true,
-      message: `Password reset approved. ${emailMessage}`,
-      emailStatus: request.emailStatus,
-      data: toResetRequestDto(request)
-    });
+    return res.json(formatResponse(true, 'Password changed. Sign in with your new password.'));
   } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to approve reset request' });
+    console.error('Password change failed:', error.message);
+    return res.status(500).json(formatResponse(false, 'Password change failed. Please try again.'));
   }
 };
 
-exports.rejectPasswordResetRequest = async (req, res) => {
-  try {
-    const request = await PasswordResetRequest.findById(req.params.id);
-    if (!request) {
-      return res.status(404).json({ success: false, message: 'Password reset request not found' });
-    }
-    if (request.status !== 'pending') {
-      return res.status(400).json({ success: false, message: 'Request has already been processed' });
-    }
-
-    request.status = 'rejected';
-    request.rejectedBy = req.user._id;
-    request.rejectedByName = req.user.name;
-    request.rejectedAt = new Date();
-    request.rejectionReason = String(req.body.reason || '').trim();
-    await request.save();
-
-    await notifyPasswordResetDecision(request, 'rejected').catch((error) => {
-      console.error('Password reset rejection notification error:', error.message);
-    });
-
-    res.json({
-      success: true,
-      message: 'Password reset request rejected.',
-      data: toResetRequestDto(request)
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to reject reset request' });
+exports.updatePreferences = async (req, res) => {
+  const { timeZone } = req.body || {};
+  if (typeof timeZone !== 'string' || !timeZone || timeZone.length > 128) {
+    return res.status(400).json(formatResponse(false, 'Select a supported time zone.'));
   }
-};
 
-// Public: immediately reset password and return the temporary password
-exports.forgotPasswordImmediate = async (req, res) => {
   try {
-    const employeeId = String(req.body.employeeId || '').trim().toUpperCase();
-    if (!employeeId) {
-      return res.status(400).json({ success: false, message: 'Employee ID is required' });
-    }
-
-    const user = await User.findOne({ employeeId, isActive: true }).select('+password');
-    if (!user) {
-      return res.status(404).json({ success: false, message: 'Employee ID not found' });
-    }
-
-    const temporaryPassword = generateTemporaryPassword();
-    user.password = temporaryPassword;
-    user.passwordChangedAt = Date.now();
-    await user.save();
-
-    // Try to email the temporary password, but do not fail if email is not configured
-    let emailResult = { sent: false, reason: 'Email not attempted' };
-    try {
-      emailResult = await sendPasswordResetEmail({
-        to: user.email,
-        name: getUserName(user),
-        employeeId: user.employeeId,
-        temporaryPassword,
-        comments: String(req.body.reason || '').trim()
-      });
-    } catch (emailError) {
-      console.error('Password reset email error:', emailError.message);
-      emailResult = { sent: false, reason: emailError.message || 'Email failed' };
-    }
-
-    // Log the password in backend logs when email wasn't sent (useful for dev)
-    if (!emailResult.sent) {
-      console.log(`[password reset immediate] Temporary password for ${user.employeeId}: ${temporaryPassword}`);
-    }
-
-    res.json({
-      success: true,
-      message: emailResult.sent ? 'Temporary password emailed' : 'Temporary password generated',
-      temporaryPassword,
-      emailStatus: emailResult.sent ? 'sent' : 'skipped',
-      employeeId: user.employeeId
-    });
-  } catch (error) {
-    res.status(500).json({ success: false, message: error.message || 'Failed to reset password' });
+    new Intl.DateTimeFormat('en', { timeZone });
+  } catch {
+    return res.status(400).json(formatResponse(false, 'Select a supported time zone.'));
   }
+
+  await User.findByIdAndUpdate(req.user.id, { timeZone });
+  return res.json(formatResponse(true, 'Time zone saved.', { timeZone }));
 };

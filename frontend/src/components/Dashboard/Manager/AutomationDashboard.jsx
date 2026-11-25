@@ -1,3 +1,4 @@
+import { businessDate, displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/AutomationDashboard.jsx
 import React, { useState, useEffect } from 'react';
 import { 
@@ -5,7 +6,7 @@ import {
   RefreshCw, CheckCircle, AlertCircle, Send, Users,
   BarChart3, Activity, Zap, Settings, Play, Pause,
   Download, Eye, Trash2, AlertTriangle, Shield, Plus
-} from 'lucide-react';
+} from '../../Common/Icons';
 import authService from '../../../services/authService';
 import employeeService from '../../../services/employeeService';
 import warningSimulatorService from '../../../services/warningSimulatorService';
@@ -255,7 +256,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
 
   const fetchReportsFromAPI = () => {
     return Promise.resolve([
-      { id: 1, title: `Weekly Report - ${managerDepartment} Team`, date: new Date().toISOString().split('T')[0], type: 'weekly', generatedBy: 'Auto System', status: 'sent' }
+      { id: 1, title: `Weekly Report - ${managerDepartment} Team`, date: businessDate(), type: 'weekly', generatedBy: 'Auto System', status: 'sent' }
     ]);
   };
 
@@ -324,7 +325,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
       
       const reportData = {
         department: managerDepartment,
-        month: new Date(selectedYear, selectedMonth).toLocaleString('default', { month: 'long' }),
+        month: displayDateTime(selectedYear, selectedMonth, 'default', { month: 'long' }),
         year: selectedYear,
         totalEmployees,
         avgAttendance: avgAttendance.toFixed(1),
@@ -351,7 +352,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
         'Total Employees': reportData.totalEmployees,
         'Average Attendance': `${reportData.avgAttendance}%`,
         'Top Performer': reportData.topPerformer,
-        'Generated On': new Date().toLocaleString()
+        'Generated On': displayDateTime(new Date())
       }];
       const wsSummary = XLSX.utils.json_to_sheet(summaryData);
       XLSX.utils.book_append_sheet(wb, wsSummary, 'Summary');
@@ -362,7 +363,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
       const newReport = {
         id: reports.length + 1,
         title: `${reportData.month} ${reportData.year} - ${managerDepartment} Attendance Report`,
-        date: new Date().toISOString().split('T')[0],
+        date: businessDate(),
         type: 'monthly',
         generatedBy: currentUser?.name || 'Auto System',
         status: 'generated'
@@ -462,7 +463,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
     const wb = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(wb, ws, `${managerDepartment} Attendance`);
     
-    const fileName = `${managerDepartment}_attendance_${new Date().toISOString().split('T')[0]}.xlsx`;
+    const fileName = `${managerDepartment}_attendance_${businessDate()}.xlsx`;
     XLSX.writeFile(wb, fileName);
   };
 
@@ -546,13 +547,13 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
           <div className="flex gap-3">
             <button 
               onClick={runAutoScan}
-              className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
             >
               <Zap className="w-4 h-4" /> Auto-Scan
             </button>
             <button 
               onClick={runManualSync}
-              className="px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
+              className="btn btn-sm btn-ghost px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20 transition-colors flex items-center gap-2"
             >
               <RefreshCw className="w-4 h-4" /> Sync Now
             </button>
@@ -749,7 +750,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
             <p className="text-purple-100 text-sm mt-1">Automatically tracked attendance for {managerDepartment} team</p>
           </div>
           <div className="overflow-x-auto">
-            <table className="w-full">
+            <table className="table w-full">
               <thead className="bg-gray-50 border-b">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Employee</th>
@@ -783,7 +784,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
             </table>
           </div>
           <div className="px-6 py-3 bg-gray-50 border-t flex justify-end">
-            <button onClick={exportAttendanceToExcel} className="px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
+            <button onClick={exportAttendanceToExcel} className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-purple-600 hover:bg-purple-50 rounded-lg transition-colors flex items-center gap-2">
               <Download className="w-4 h-4" /> Export to Excel
             </button>
           </div>
@@ -799,23 +800,23 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
               <p className="text-purple-100 text-sm mt-1">Weekly and monthly reports automatically generated</p>
             </div>
             <div className="p-4 border-b bg-gray-50 flex flex-wrap gap-3 justify-between items-center">
-              <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} className="px-3 py-1.5 border rounded-lg text-sm">
+              <select value={selectedPeriod} onChange={(e) => setSelectedPeriod(e.target.value)} className="select px-3 py-1.5 border rounded-lg text-sm">
                 <option value="week">This Week</option>
                 <option value="month">This Month</option>
                 <option value="quarter">This Quarter</option>
               </select>
               <div className="flex gap-2">
-                <select value={selectedMonth} onChange={(e) => setSelectedMonth(parseInt(e.target.value))} className="px-3 py-1.5 border rounded-lg text-sm">
+                <select value={selectedMonth} onChange={(e) => setSelectedMonth(parseInt(e.target.value))} className="select px-3 py-1.5 border rounded-lg text-sm">
                   {[...Array(12)].map((_, i) => (
-                    <option key={i} value={i}>{new Date(selectedYear, i).toLocaleString('default', { month: 'long' })}</option>
+                    <option key={i} value={i}>{displayDateTime(selectedYear, i, 'default', { month: 'long' })}</option>
                   ))}
                 </select>
-                <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} className="px-3 py-1.5 border rounded-lg text-sm">
+                <select value={selectedYear} onChange={(e) => setSelectedYear(parseInt(e.target.value))} className="select px-3 py-1.5 border rounded-lg text-sm">
                   {[2024, 2025, 2026].map(year => (
                     <option key={year} value={year}>{year}</option>
                   ))}
                 </select>
-                <button onClick={generateMonthlyReport} disabled={generatingReport} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors">
+                <button onClick={generateMonthlyReport} disabled={generatingReport} className="btn btn-sm btn-ghost px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors">
                   {generatingReport ? 'Generating...' : 'Generate Report'}
                 </button>
               </div>
@@ -983,7 +984,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                             <p className="text-sm text-gray-600 mt-2">{warning.reason}</p>
                             <div className="flex items-center space-x-4 mt-2">
                               <p className="text-xs text-gray-400">
-                                Issued: {new Date(warning.createdAt).toLocaleString()}
+                                Issued: {displayDateTime(warning.createdAt)}
                               </p>
                               {warning.emailSent && (
                                 <button className="text-xs text-blue-600 hover:underline">
@@ -993,7 +994,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                             </div>
                           </div>
                         </div>
-                        <button className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors">
+                        <button className="btn btn-sm btn-ghost px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors">
                           Details
                         </button>
                       </div>
@@ -1021,7 +1022,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                     value={scheduleConfig.name}
                     onChange={(e) => setScheduleConfig({...scheduleConfig, name: e.target.value})}
                     placeholder="e.g., Weekly Team Report"
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
                 <div>
@@ -1029,7 +1030,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                   <select
                     value={scheduleConfig.reportType}
                     onChange={(e) => setScheduleConfig({...scheduleConfig, reportType: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="select w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="team">Team Report</option>
                     <option value="attendance">Attendance Report</option>
@@ -1041,7 +1042,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                   <select
                     value={scheduleConfig.frequency}
                     onChange={(e) => setScheduleConfig({...scheduleConfig, frequency: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="select w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   >
                     <option value="daily">Daily</option>
                     <option value="weekly">Weekly</option>
@@ -1054,7 +1055,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                     <select
                       value={scheduleConfig.dayOfWeek}
                       onChange={(e) => setScheduleConfig({...scheduleConfig, dayOfWeek: e.target.value})}
-                      className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                      className="select w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                     >
                       <option value="monday">Monday</option>
                       <option value="tuesday">Tuesday</option>
@@ -1072,7 +1073,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                     type="time"
                     value={scheduleConfig.time}
                     onChange={(e) => setScheduleConfig({...scheduleConfig, time: e.target.value})}
-                    className="w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
                 </div>
               </div>
@@ -1086,9 +1087,9 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                     value={recipientInput}
                     onChange={(e) => setRecipientInput(e.target.value)}
                     placeholder="Enter email address"
-                    className="flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
+                    className="input flex-1 px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
                   />
-                  <button onClick={handleAddRecipient} className="px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
+                  <button onClick={handleAddRecipient} className="btn btn-sm btn-ghost px-4 py-2 bg-gray-100 rounded-lg hover:bg-gray-200">
                     Add
                   </button>
                 </div>
@@ -1103,10 +1104,10 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">
-                <button onClick={() => setShowScheduleForm(false)} className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
+                <button onClick={() => setShowScheduleForm(false)} className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200">
                   Cancel
                 </button>
-                <button onClick={handleScheduleReport} className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
+                <button onClick={handleScheduleReport} className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
                   Schedule Report
                 </button>
               </div>
@@ -1122,7 +1123,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
               </div>
               <button
                 onClick={() => setShowScheduleForm(!showScheduleForm)}
-                className="px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center gap-2"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-white/20 text-white rounded-lg hover:bg-white/30 transition-colors flex items-center gap-2"
               >
                 <Plus className="w-4 h-4" />
                 <span>Schedule Report</span>
@@ -1175,7 +1176,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
           <div className="bg-white rounded-xl border shadow-sm p-6">
             <div className="flex justify-between items-center mb-4">
               <h3 className="font-semibold text-gray-900">📧 Email Settings</h3>
-              <button onClick={sendEmailReport} disabled={sendingEmail} className="px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors">
+              <button onClick={sendEmailReport} disabled={sendingEmail} className="btn btn-sm btn-ghost px-3 py-1.5 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors">
                 {sendingEmail ? 'Sending...' : 'Send Test Email'}
               </button>
             </div>
@@ -1205,7 +1206,7 @@ const AutomationDashboard = ({ user, userRole = 'Manager' }) => {
                   <div key={idx} className="px-6 py-3 flex justify-between items-center hover:bg-gray-50">
                     <div>
                       <p className="text-sm font-medium text-gray-900">{notif.subject || 'Email Notification'}</p>
-                      <p className="text-xs text-gray-500">To: {notif.to || currentUser?.email} • {notif.time || new Date(notif.sentAt).toLocaleString()}</p>
+                      <p className="text-xs text-gray-500">To: {notif.to || currentUser?.email} • {notif.time || displayDateTime(notif.sentAt)}</p>
                     </div>
                     <div className="flex items-center gap-3">
                       <span className={`px-2 py-1 text-xs rounded-full ${notif.status === 'sent' ? 'bg-green-100 text-green-700' : 'bg-yellow-100 text-yellow-700'}`}>

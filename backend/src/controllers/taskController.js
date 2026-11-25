@@ -2,6 +2,59 @@ const Task = require('../models/Task');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 const { notifyTaskAssigned } = require('../utils/notificationDispatcher');
+const { businessDate } = require('../utils/businessTime');
+const { normalizeDepartment } = require('../config/departments');
+
+const companyTaskRoles = new Set(['CEO', 'COO', 'Manager']);
+const teamTaskRoles = new Set(['Team Lead', 'CO Head', 'Co-Head']);
+const defaultDepartment = 'Core Systems';
+
+function canManageTask(user, department) {
+  return companyTaskRoles.has(user.role) || (teamTaskRoles.has(user.role) && user.department &&
+    normalizeDepartment(user.department) === normalizeDepartment(department));
+}
+
+function canUpdateProgress(user, task) {
+  if (canManageTask(user, task.department)) return true;
+  if (task.assignedTo) return [user.id, user.employeeId].includes(String(task.assignedTo));
+  return Boolean(task.assignedToName && [getUserName(user), user.employeeId].includes(task.assignedToName));
+}
+
+function taskDueDate(value) {
+  if (value === '' || value === null || value === undefined) return '';
+  if (typeof value !== 'string') return null;
+  const input = value.trim();
+  const date = input.slice(0, 10);
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date) || !Number.isFinite(Date.parse(date)) ||
+      !new Date(date).toISOString().startsWith(date)) return null;
+  if (input === date) return date;
+  if (!/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2}(?:\.\d+)?)?(?:Z|[+-]\d{2}:\d{2})$/.test(input) ||
+      !Number.isFinite(Date.parse(input))) return null;
+  return businessDate(new Date(input));
+}
+
+function dueDateError(date) {
+  if (date === null) return 'Enter a valid task due date.';
+  if (date && date < businessDate()) return 'Task due dates must be today or later (India time).';
+  return null;
+}
+
+async function assigneeFields(assignedTo, fallback = {}) {
+  const assignee = assignedTo ? await User.findById(assignedTo) : null;
+  if (!assignee) {
+    return {
+      assignedTo: assignedTo || '',
+      assignedToName: fallback.assignedToName || '',
+      assignedToInitials: fallback.assignedToInitials || ''
+    };
+  }
+  const name = getUserName(assignee);
+  return {
+    assignedTo: assignee.id,
+    assignedToName: name,
+    assignedToInitials: name.split(/\s+/).slice(0, 2).map(part => part.charAt(0)).join('').toUpperCase()
+  };
+}
 
 const getUserName = (user) =>
   user?.name || user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
@@ -57,14 +110,20 @@ exports.createTask = async (req, res) => {
       dueDate,
       estimatedHours,
       progress,
-      status,
-      createdBy,
-      createdAt
-    } = req.body;
+      status
+    } = req.body || {};
 
-    if (!title) {
-      return res.status(400).json(formatResponse(false, 'title is required'));
+    if (typeof title !== 'string' || !title.trim()) {
+      return res.status(400).json(formatResponse(false, 'Task title is required.'));
     }
+
+    const targetDepartment = department || req.user.department || defaultDepartment;
+    if (!canManageTask(req.user, targetDepartment)) {
+      return res.status(403).json(formatResponse(false, 'You cannot create tasks for this department.'));
+    }
+    const date = taskDueDate(dueDate);
+    const dateError = dueDateError(date);
+    if (dateError) return res.status(400).json(formatResponse(false, dateError));
 
     const coercedEstimatedHours = estimatedHours === undefined || estimatedHours === null || estimatedHours === ''
       ? 0
@@ -82,37 +141,22 @@ exports.createTask = async (req, res) => {
       return res.status(400).json(formatResponse(false, 'progress must be a number between 0 and 100'));
     }
 
-    // Normalize assigned user fields if possible
-    let finalAssignedToName = assignedToName;
-    let finalAssignedToInitials = assignedToInitials;
-
-    if (assignedTo) {
-      const u = await User.findById(assignedTo).select('-password');
-      if (u) {
-        finalAssignedToName = finalAssignedToName || (u.fullName || `${u.firstName || ''} ${u.lastName || ''}`.trim());
-        finalAssignedToInitials = finalAssignedToInitials || `${(u.firstName || ' ')[0]}${(u.lastName || ' ')[0]}`.toUpperCase();
-      }
-    }
-
+    const assignment = await assigneeFields(assignedTo, { assignedToName, assignedToInitials });
     const task = await Task.create({
-      title,
+      title: title.trim(),
       description: description || '',
-      assignedTo,
-      assignedToName: finalAssignedToName || '',
-      assignedToInitials: finalAssignedToInitials || '',
-      department: department || 'Core Systems',
+      ...assignment,
+      department: targetDepartment,
       priority: priority || 'medium',
-      // Schema stores dueDate as String; accept date or yyyy-mm-dd and store as provided.
-      dueDate: dueDate || '',
+      dueDate: date,
       estimatedHours: Math.max(0, coercedEstimatedHours),
       progress: coercedProgress,
       status: status || 'Pending',
-      createdBy,
-      createdAt: createdAt || new Date().toISOString()
+      createdBy: req.user.id
     });
 
     if (req.user?.role === 'Team Lead') {
-      await notifyTaskAssigned(task);
+      await notifyTaskAssigned(task).catch(error => console.error('Task notification failed:', error.message));
     }
 
     res.status(201).json(formatResponse(true, 'Task created successfully', task));
@@ -129,12 +173,36 @@ exports.createTask = async (req, res) => {
 // PUT /api/tasks/:id
 exports.updateTask = async (req, res) => {
   try {
-    const { id } = req.params;
-    const updates = req.body;
-
-    const task = await Task.findByIdAndUpdate(id, updates, { new: true });
+    const task = await Task.findById(req.params.id);
     if (!task) return res.status(404).json(formatResponse(false, 'Task not found'));
 
+    const body = req.body || {};
+    if (!canManageTask(req.user, task.department) ||
+        (Object.hasOwn(body, 'department') && !canManageTask(req.user, body.department))) {
+      return res.status(403).json(formatResponse(false, 'You cannot edit this task.'));
+    }
+
+    const fields = ['title', 'description', 'department', 'priority', 'estimatedHours', 'status', 'progress'];
+    const updates = Object.fromEntries(fields.filter(field => Object.hasOwn(body, field))
+      .map(field => [field, body[field]]));
+    if (Object.hasOwn(body, 'title')) {
+      if (typeof body.title !== 'string' || !body.title.trim()) {
+        return res.status(400).json(formatResponse(false, 'Task title is required.'));
+      }
+      updates.title = body.title.trim();
+    }
+    if (Object.hasOwn(body, 'dueDate') && body.dueDate !== task.dueDate) {
+      const date = taskDueDate(body.dueDate);
+      const dateError = dueDateError(date);
+      if (dateError) return res.status(400).json(formatResponse(false, dateError));
+      updates.dueDate = date;
+    }
+    if (Object.hasOwn(body, 'assignedTo') && String(body.assignedTo || '') !== String(task.assignedTo || '')) {
+      Object.assign(updates, await assigneeFields(body.assignedTo));
+    }
+
+    Object.assign(task, updates);
+    await task.save();
     res.json(formatResponse(true, 'Task updated successfully', task));
   } catch (err) {
     res.status(500).json(formatResponse(false, err.message));
@@ -157,6 +225,12 @@ exports.updateTaskProgress = async (req, res) => {
     }
 
     const finalStatus = status || (coercedProgress >= 100 ? 'Completed' : coercedProgress > 0 ? 'In progress' : 'Pending');
+
+    const existing = await Task.findById(id);
+    if (!existing) return res.status(404).json(formatResponse(false, 'Task not found'));
+    if (!canUpdateProgress(req.user, existing)) {
+      return res.status(403).json(formatResponse(false, 'You cannot update this task.'));
+    }
 
     const task = await Task.findByIdAndUpdate(
       id,
@@ -302,6 +376,12 @@ exports.createDailyLogEntry = async (req, res) => {
 exports.completeTaskById = async (req, res) => {
   try {
     const { id } = req.params;
+    const existing = await Task.findById(id);
+    if (!existing) return res.status(404).json(formatResponse(false, 'Task not found'));
+    if (!canUpdateProgress(req.user, existing)) {
+      return res.status(403).json(formatResponse(false, 'You cannot update this task.'));
+    }
+
     const task = await Task.findByIdAndUpdate(
       id,
       { status: 'Completed', progress: 100 },
@@ -333,8 +413,12 @@ exports.getTaskById = async (req, res) => {
 exports.deleteTask = async (req, res) => {
   try {
     const { id } = req.params;
-    const task = await Task.findByIdAndDelete(id);
+    const task = await Task.findById(id);
     if (!task) return res.status(404).json(formatResponse(false, 'Task not found'));
+    if (!canManageTask(req.user, task.department)) {
+      return res.status(403).json(formatResponse(false, 'You cannot delete this task.'));
+    }
+    await Task.findByIdAndDelete(id);
     return res.json(formatResponse(true, 'Task deleted successfully', task));
   } catch (err) {
     return res.status(500).json(formatResponse(false, err.message));
@@ -352,6 +436,12 @@ exports.updateTaskStatus = async (req, res) => {
     const validStatuses = ['Pending', 'In progress', 'Completed', 'Overdue', 'Cancelled'];
     if (!validStatuses.includes(status)) {
       return res.status(400).json(formatResponse(false, `Invalid status. Must be one of: ${validStatuses.join(', ')}`));
+    }
+
+    const existing = await Task.findById(id);
+    if (!existing) return res.status(404).json(formatResponse(false, 'Task not found'));
+    if (!canUpdateProgress(req.user, existing)) {
+      return res.status(403).json(formatResponse(false, 'You cannot update this task.'));
     }
 
     const task = await Task.findByIdAndUpdate(
@@ -418,7 +508,11 @@ exports.getTaskStats = async (req, res) => {
     const completed = tasks.filter(t => t.status === 'Completed').length;
     const inProgress = tasks.filter(t => t.status === 'In progress').length;
     const pending = tasks.filter(t => t.status === 'Pending').length;
-    const overdue = tasks.filter(t => t.status === 'Overdue' || (t.dueDate && new Date(t.dueDate) < new Date() && t.status !== 'Completed')).length;
+    const today = businessDate();
+    const overdue = tasks.filter(task => {
+      const dueDate = taskDueDate(task.dueDate);
+      return task.status === 'Overdue' || (task.status !== 'Completed' && dueDate && dueDate < today);
+    }).length;
 
     const highPriority = tasks.filter(t => t.priority === 'high' || t.priority === 'High').length;
     const mediumPriority = tasks.filter(t => t.priority === 'medium' || t.priority === 'Medium').length;
@@ -523,6 +617,10 @@ exports.bulkUpdateStatus = async (req, res) => {
       return res.status(400).json(formatResponse(false, `Invalid status. Must be one of: ${validStatuses.join(', ')}`));
     }
 
+    const tasks = await Task.find({ _id: { $in: taskIds } });
+    if (tasks.some(task => !canUpdateProgress(req.user, task))) {
+      return res.status(403).json(formatResponse(false, 'You do not have permission for all selected tasks.'));
+    }
     const result = await Task.updateMany({ _id: { $in: taskIds } }, {
       status,
       ...(status === 'Completed' ? { progress: 100 } : {})
@@ -540,6 +638,10 @@ exports.bulkDeleteTasks = async (req, res) => {
     const { taskIds } = req.body;
     if (!Array.isArray(taskIds) || taskIds.length === 0) return res.status(400).json(formatResponse(false, 'taskIds is required'));
 
+    const tasks = await Task.find({ _id: { $in: taskIds } });
+    if (tasks.some(task => !canManageTask(req.user, task.department))) {
+      return res.status(403).json(formatResponse(false, 'You do not have permission for all selected tasks.'));
+    }
     const result = await Task.deleteMany({ _id: { $in: taskIds } });
     return res.json(formatResponse(true, 'Bulk delete completed', result));
   } catch (err) {

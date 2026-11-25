@@ -1,7 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import logo from '../../assets/spaceborn-logo.png';
 import ForgotPassword from './ForgotPassword';
+import ResetPassword from './ResetPassword';
+import Signup from './Signup';
+import { Eye, EyeOff } from '../Common/Icons';
+import { displayTime } from '../../utils/timeZone';
 import { normalizeDepartmentFields } from '../../utils/departments';
+
+const currentPath = () => window.location.pathname.replace(/\/+$/, '') || '/';
 
 const LoginSystem = ({ onLoginSuccess }) => {
   const [employeeId, setEmployeeId] = useState('');
@@ -13,7 +19,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
   const [loginAttempts, setLoginAttempts] = useState(0);
   const [isLocked, setIsLocked] = useState(false);
   const [lockoutTime, setLockoutTime] = useState(null);
-  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [pathname, setPathname] = useState(currentPath);
 
   useEffect(() => {
     const rememberedId = localStorage.getItem('rememberedEmployeeId');
@@ -21,6 +27,12 @@ const LoginSystem = ({ onLoginSuccess }) => {
       setEmployeeId(rememberedId);
       setRememberMe(true);
     }
+  }, []);
+
+  useEffect(() => {
+    const syncPath = () => setPathname(currentPath());
+    window.addEventListener('popstate', syncPath);
+    return () => window.removeEventListener('popstate', syncPath);
   }, []);
 
   const isAccountLocked = () => {
@@ -34,7 +46,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
   // Auto-mark attendance on login
   const markAttendance = async (user, token) => {
     try {
-      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+      const API_BASE_URL = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
       await fetch(`${API_BASE_URL}/attendance/auto-mark`, {
         method: 'POST',
         headers: {
@@ -73,13 +85,21 @@ const LoginSystem = ({ onLoginSuccess }) => {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 
-          employeeId: employeeId.toUpperCase(), 
+          employeeId: employeeId.trim(),
           password: password 
         }),
       });
 
+      if (!response.headers.get('content-type')?.includes('application/json')) {
+        setError('The sign-in service did not respond. Open the CRM from its running server and try again.');
+        return;
+      }
       const data = await response.json();
 
+      if (!response.ok && response.status !== 401) {
+        setError(data.message || 'Sign-in is temporarily unavailable. Try again.');
+        return;
+      }
       if (!response.ok) {
         const newAttempts = loginAttempts + 1;
         setLoginAttempts(newAttempts);
@@ -90,17 +110,20 @@ const LoginSystem = ({ onLoginSuccess }) => {
           setIsLocked(true);
           setError(`Too many failed attempts. Account locked for 15 minutes.`);
         } else {
-          setError(data.message || `Invalid Employee ID or Password. ${5 - newAttempts} attempts remaining.`);
+          setError(data.message || `Invalid sign-in details. ${5 - newAttempts} attempts remaining.`);
         }
-        setIsLoading(false);
         return;
       }
 
       setLoginAttempts(0);
       setIsLocked(false);
       
-      const user = normalizeDepartmentFields(data.data.user);
-      const token = data.data.token;
+      const { user: account, token } = data.data || {};
+      if (!account || !token) {
+        setError('The sign-in service returned an incomplete response. Try again.');
+        return;
+      }
+      const user = normalizeDepartmentFields(account);
 
       localStorage.setItem('authToken', token);
       localStorage.setItem('user', JSON.stringify(user));
@@ -108,7 +131,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
         ...user,
         isAuthenticated: true,
         timestamp: Date.now(),
-        loginTime: new Date().toLocaleTimeString()
+        loginTime: displayTime(new Date())
       }));
 
       if (rememberMe) {
@@ -122,81 +145,87 @@ const LoginSystem = ({ onLoginSuccess }) => {
       
     } catch (error) {
       console.error('Login error:', error);
-      setError(`Could not connect to the API (${API_BASE_URL}). Check the frontend REACT_APP_API_URL setting and backend availability.`);
+      setError('Could not reach the sign-in service. Check your connection and try again.');
+    } finally {
+      setIsLoading(false);
     }
-    
-    setIsLoading(false);
   };
 
 
-  const handleForgotPasswordClick = () => {
-    if (!employeeId) {
-      setError('Please enter your Employee ID before requesting password reset');
-      return;
-    }
-    setShowForgotPassword(true);
+  const navigate = (path, replace = false) => {
+    if (replace) window.history.replaceState(window.history.state, '', path);
+    else window.history.pushState(window.history.state, '', path);
+    setPathname(path);
   };
 
   const handleBackToLogin = () => {
-    setShowForgotPassword(false);
+    navigate('/', true);
     setError('');
   };
 
   const lockStatus = isAccountLocked();
 
-  if (showForgotPassword) {
-    return <ForgotPassword onBackToLogin={handleBackToLogin} />;
+  if (pathname === '/signup') return <Signup onBack={handleBackToLogin} />;
+  if (pathname === '/forgot-password') {
+    return <ForgotPassword initialEmployeeId={employeeId} onBackToLogin={handleBackToLogin} />;
+  }
+  if (pathname === '/reset-password') {
+    return <ResetPassword onBackToLogin={handleBackToLogin} onRequestNewLink={() => navigate('/forgot-password', true)} />;
   }
 
   return (
-    <div className="min-h-screen bg-white flex items-center justify-center p-4">
+    <div className="min-h-screen bg-base-200 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         <div className="text-center mb-8">
           <img src={logo} alt="Spaceborn" className="h-24 w-auto mx-auto mb-4" />
           <p className="text-gray-500">Workforce & Platform and DevOps Management System</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-8">
+        <div className="card block bg-base-100 shadow-sm border border-base-300 p-8">
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Employee Login</h2>
             <p className="text-sm text-gray-500 mt-1">Enter your credentials to access your dashboard</p>
           </div>
           
           {error && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="alert alert-error mb-4 text-sm" role="alert">
               {error}
             </div>
           )}
 
           {lockStatus.locked && (
-            <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+            <div className="alert alert-error mb-4 text-sm" role="alert">
               ⚠️ Account locked for {lockStatus.remainingMinutes} minutes due to multiple failed attempts.
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Employee ID</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="login-id">Employee ID or email</label>
               <input
+                id="login-id"
                 type="text"
+                autoComplete="username"
                 value={employeeId}
-                onChange={(e) => setEmployeeId(e.target.value.toUpperCase())}
-                className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all"
-                placeholder="Enter your Employee ID (e.g., EMP001)"
+                onChange={(e) => setEmployeeId(e.target.value)}
+                className="input w-full"
+                placeholder="Employee ID or email"
                 required
                 disabled={isLoading || lockStatus.locked}
-                autoCapitalize="characters"
+                autoCapitalize="none"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1.5">Password</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="login-password">Password</label>
               <div className="relative">
                 <input
+                  id="login-password"
+                  autoComplete="current-password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-black focus:ring-1 focus:ring-black transition-all pr-10"
+                  className="input w-full pr-12"
                   placeholder="Enter your password"
                   required
                   disabled={isLoading || lockStatus.locked}
@@ -204,9 +233,10 @@ const LoginSystem = ({ onLoginSuccess }) => {
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                  className="btn btn-ghost btn-sm absolute right-1 top-1/2 -translate-y-1/2"
+                  aria-label={showPassword ? 'Hide password' : 'Show password'}
                 >
-                  {showPassword ? '🙈' : '👁️'}
+                  {showPassword ? <EyeOff /> : <Eye />}
                 </button>
               </div>
             </div>
@@ -217,16 +247,16 @@ const LoginSystem = ({ onLoginSuccess }) => {
                   type="checkbox" 
                   checked={rememberMe}
                   onChange={(e) => setRememberMe(e.target.checked)}
-                  className="w-4 h-4 rounded border-gray-300 text-black focus:ring-black"
+                  className="checkbox checkbox-sm"
                   disabled={isLoading || lockStatus.locked}
                 />
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
               <button 
                 type="button" 
-                className="text-sm text-gray-500 hover:text-black transition-colors"
-                onClick={handleForgotPasswordClick}
-                disabled={isLoading || lockStatus.locked}
+                className="link link-hover text-sm"
+                onClick={() => navigate('/forgot-password')}
+                disabled={isLoading}
               >
                 Forgot password?
               </button>
@@ -235,14 +265,11 @@ const LoginSystem = ({ onLoginSuccess }) => {
             <button
               type="submit"
               disabled={isLoading || lockStatus.locked}
-              className="w-full bg-black text-white py-2.5 rounded-lg font-medium hover:bg-gray-800 transition-all duration-200 disabled:opacity-70 disabled:cursor-not-allowed flex items-center justify-center space-x-2 mt-6"
+              className="btn btn-neutral w-full mt-6"
             >
               {isLoading ? (
                 <>
-                  <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
+                  <span className="loading loading-spinner h-5 w-5 text-white" aria-hidden="true" />
                   <span>Authenticating...</span>
                 </>
               ) : (
@@ -251,14 +278,8 @@ const LoginSystem = ({ onLoginSuccess }) => {
             </button>
           </form>
 
-          <div className="mt-6 pt-6 border-t border-gray-100">
-            <div className="text-center text-sm text-gray-500">
-              <p>⏰ Working Hours: 8:00 AM - 12:00 AM</p>
-              <p className="mt-1">📍 Mandatory login within shift timing</p>
-              <p className="mt-2 text-xs text-gray-400">Employee IDs are assigned and controlled by your Manager</p>
-              <p className="mt-1 text-xs text-gray-400">🔒 5 failed attempts = 15 minutes lockout</p>
-            </div>
-          </div>
+          <button type="button" className="btn btn-outline w-full mt-3" onClick={() => navigate('/signup')}>Request an account</button>
+
         </div>
 
 

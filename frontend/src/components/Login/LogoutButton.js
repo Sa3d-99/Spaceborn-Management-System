@@ -1,3 +1,4 @@
+import { LogOut as IconLogOut } from '../Common/Icons';
 // src/components/Login/LogoutButton.jsx
 import React, { useState } from 'react';
 import authService from '../../services/authService';
@@ -88,17 +89,12 @@ const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
         >
           {isLoggingOut ? (
             <>
-              <svg className="animate-spin h-5 w-5 text-red-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <span className="loading loading-spinner h-5 w-5 text-red-600" aria-hidden="true" />
               <span>Logging out...</span>
             </>
           ) : (
             <>
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-              </svg>
+              <IconLogOut className="w-5 h-5" />
               <span>Logout</span>
             </>
           )}
@@ -111,9 +107,7 @@ const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
           <div className="bg-white rounded-xl p-6 max-w-sm w-full shadow-xl animate-scale-up">
             <div className="flex items-center justify-center mb-4">
               <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-                </svg>
+                <IconLogOut className="w-6 h-6 text-red-600" />
               </div>
             </div>
             <h3 className="text-lg font-semibold text-center text-gray-900 mb-2">
@@ -132,7 +126,7 @@ const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
             <div className="flex space-x-3">
               <button
                 onClick={handleCancel}
-                className="flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
+                className="btn btn-sm btn-ghost flex-1 px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
                 disabled={isLoggingOut}
               >
                 Cancel
@@ -140,14 +134,11 @@ const LogoutButton = ({ onLogout, className = "", userRole, userName }) => {
               <button
                 onClick={handleLogout}
                 disabled={isLoggingOut}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
+                className="btn btn-sm btn-ghost flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center space-x-2"
               >
                 {isLoggingOut ? (
                   <>
-                    <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
+                    <span className="loading loading-spinner h-4 w-4 text-white" aria-hidden="true" />
                     <span>Logging out...</span>
                   </>
                 ) : (

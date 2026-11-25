@@ -1,5 +1,6 @@
 const Notification = require('../models/Notification');
 const User = require('../models/User');
+const { canReviewRequest } = require('./requestPermissions');
 
 const uniqueIds = (ids) => [...new Set(ids.filter(Boolean).map(String))];
 
@@ -123,8 +124,30 @@ const notifyLeaveDecision = async (leave) => {
   });
 };
 
-const notifyResourceRequested = async (request) => {
-  return notifyRoles(['CEO', 'COO'], {
+const notifyReviewers = async (requester, payload) => {
+  const users = await User.find({ isActive: { $ne: false } });
+  return notifyUsers(users.filter(user => canReviewRequest(user, requester)), payload);
+};
+
+const notifyHourBreakRequested = (request, requester) => notifyReviewers(requester, {
+  title: 'New Hour Break Request',
+  message: `${request.userName} requested ${request.hours} hour(s) on ${request.date}`,
+  category: 'Leave',
+  actionUrl: '/leave',
+  actionLabel: 'Review Hour Break'
+});
+
+const notifyHourBreakDecision = (request, requester) => notifyUsers([requester], {
+  title: `Hour Break ${request.status === 'approved' ? 'Approved' : 'Rejected'}`,
+  message: `Your hour break on ${request.date} was ${request.status}.`,
+  description: request.rejectionReason || '',
+  category: 'Leave',
+  actionUrl: '/leave',
+  actionLabel: 'View Hour Break'
+});
+
+const notifyResourceRequested = async (request, requester) => {
+  return notifyReviewers(requester, {
     title: 'New Resource Request',
     message: `${request.requesterName} requested ${request.resourceName}`,
     description: request.reason,
@@ -263,6 +286,8 @@ module.exports = {
   notifyMeetingCreated,
   notifyLeaveRequested,
   notifyLeaveDecision,
+  notifyHourBreakRequested,
+  notifyHourBreakDecision,
   notifyResourceRequested,
   notifyResourceDecision,
   notifyReportSubmitted,

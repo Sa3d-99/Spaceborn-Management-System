@@ -1,3 +1,5 @@
+import { Send as IconSend, X as IconX } from '../../Common/Icons';
+import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/TeamLead/TeamLeadDashboard.js
 import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
@@ -135,7 +137,7 @@ const TeamLeadDashboard = () => {
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
-    return new Date(dateString).toLocaleDateString('en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
+    return displayDate(dateString, 'en-IN', { month: 'short', day: 'numeric', year: 'numeric' });
   };
 
   const handleSendReportToCEO = async (e) => {
@@ -245,11 +247,9 @@ const TeamLeadDashboard = () => {
           </div>
           <button
             onClick={() => setShowSendModal(true)}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center gap-2 text-sm font-medium"
           >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-            </svg>
+            <IconSend className="w-4 h-4" />
             Send Daily Report to CEO
           </button>
         </div>
@@ -409,9 +409,7 @@ const TeamLeadDashboard = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Send Daily Report to CEO</h2>
                 <button onClick={() => setShowSendModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IconX className="w-6 h-6" />
                 </button>
               </div>
               
@@ -429,7 +427,7 @@ const TeamLeadDashboard = () => {
                     rows="3"
                     value={reportData.summary}
                     onChange={(e) => setReportData({...reportData, summary: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="Overall summary of today's progress..."
                     required
                   />
@@ -441,7 +439,7 @@ const TeamLeadDashboard = () => {
                     rows="2"
                     value={reportData.highlights}
                     onChange={(e) => setReportData({...reportData, highlights: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="What went well today? Achievements, milestones..."
                   />
                 </div>
@@ -452,7 +450,7 @@ const TeamLeadDashboard = () => {
                     rows="2"
                     value={reportData.challenges}
                     onChange={(e) => setReportData({...reportData, challenges: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="Any challenges faced? Need CEO attention?"
                   />
                 </div>
@@ -463,7 +461,7 @@ const TeamLeadDashboard = () => {
                     rows="2"
                     value={reportData.tomorrowPlan}
                     onChange={(e) => setReportData({...reportData, tomorrowPlan: e.target.value})}
-                    className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
+                    className="textarea w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-500 text-sm resize-none"
                     placeholder="What's planned for tomorrow?"
                   />
                 </div>
@@ -479,10 +477,10 @@ const TeamLeadDashboard = () => {
                 </div>
                 
                 <div className="flex justify-end gap-3 pt-2">
-                  <button type="button" onClick={() => setShowSendModal(false)} className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
+                  <button type="button" onClick={() => setShowSendModal(false)} className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 text-sm hover:bg-gray-50">
                     Cancel
                   </button>
-                  <button type="submit" disabled={sendingReport} className="px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-2">
+                  <button type="submit" disabled={sendingReport} className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg text-sm hover:bg-purple-700 transition-colors flex items-center gap-2">
                     {sendingReport ? (
                       <>
                         <div className="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
@@ -490,9 +488,7 @@ const TeamLeadDashboard = () => {
                       </>
                     ) : (
                       <>
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
-                        </svg>
+                        <IconSend className="w-4 h-4" />
                         Send Report
                       </>
                     )}
@@ -512,9 +508,7 @@ const TeamLeadDashboard = () => {
               <div className="flex justify-between items-center mb-4">
                 <h2 className="text-xl font-bold text-gray-900">Team Member Details</h2>
                 <button onClick={() => setShowMemberModal(false)} className="text-gray-400 hover:text-gray-600">
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                  </svg>
+                  <IconX className="w-6 h-6" />
                 </button>
               </div>
               
@@ -542,7 +536,7 @@ const TeamLeadDashboard = () => {
                 </div>
                 
                 <div className="pt-4">
-                  <button className="w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
+                  <button className="btn btn-sm btn-ghost w-full px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors">
                     Assign New Task
                   </button>
                 </div>

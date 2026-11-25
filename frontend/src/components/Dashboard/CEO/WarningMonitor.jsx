@@ -1,3 +1,5 @@
+import { AlertTriangle as IconAlertTriangle, Search as IconSearch } from '../../Common/Icons';
+import { displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/WarningMonitor.jsx
 import React, { useState, useEffect } from 'react';
 import warningSimulatorService from '../../../services/warningSimulatorService';
@@ -153,7 +155,7 @@ const WarningMonitor = ({ userRole }) => {
           <button
             onClick={runAutoScan}
             disabled={autoScanning}
-            className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
+            className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors disabled:opacity-50 flex items-center space-x-2"
           >
             {autoScanning ? (
               <>
@@ -162,9 +164,7 @@ const WarningMonitor = ({ userRole }) => {
               </>
             ) : (
               <>
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
+                <IconSearch className="w-4 h-4" />
                 <span>Run Auto-Scan</span>
               </>
             )}
@@ -172,7 +172,7 @@ const WarningMonitor = ({ userRole }) => {
           <button
             onClick={loadData}
             disabled={loading}
-            className="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+            className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
           >
             Refresh
           </button>
@@ -183,9 +183,7 @@ const WarningMonitor = ({ userRole }) => {
       {scanResults.length > 0 && (
         <div className="bg-yellow-50 border border-yellow-200 rounded-xl p-4">
           <div className="flex items-start space-x-3">
-            <svg className="w-5 h-5 text-yellow-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-            </svg>
+            <IconAlertTriangle className="w-5 h-5 text-yellow-600 mt-0.5" />
             <div>
               <p className="font-medium text-yellow-800">Auto-Scan Complete</p>
               <p className="text-sm text-yellow-700">
@@ -226,7 +224,7 @@ const WarningMonitor = ({ userRole }) => {
           <select
             value={filterType}
             onChange={(e) => setFilterType(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm"
+            className="select px-3 py-2 border rounded-lg text-sm"
           >
             <option value="all">All Types</option>
             <option value="daily_report">Daily Report</option>
@@ -239,7 +237,7 @@ const WarningMonitor = ({ userRole }) => {
           <select
             value={filterDepartment}
             onChange={(e) => setFilterDepartment(e.target.value)}
-            className="px-3 py-2 border rounded-lg text-sm"
+            className="select px-3 py-2 border rounded-lg text-sm"
           >
             <option value="all">All Departments</option>
             {departments.map(dept => (
@@ -289,7 +287,7 @@ const WarningMonitor = ({ userRole }) => {
                         <p className="text-sm text-gray-600 mt-2">{warning.reason}</p>
                         <div className="flex items-center space-x-4 mt-2">
                           <p className="text-xs text-gray-400">
-                            Issued: {new Date(warning.createdAt).toLocaleString()}
+                            Issued: {displayDateTime(warning.createdAt)}
                           </p>
                           {warning.emailSent && (
                             <button
@@ -313,13 +311,13 @@ const WarningMonitor = ({ userRole }) => {
                           setSelectedWarning(warning);
                           setShowDetails(true);
                         }}
-                        className="px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
+                        className="btn btn-sm btn-ghost px-3 py-1 text-sm text-blue-600 hover:bg-blue-50 rounded transition-colors"
                       >
                         Details
                       </button>
                       <button
                         onClick={() => handleDismissWarning(warning.id)}
-                        className="px-3 py-1 text-sm text-green-600 hover:bg-green-50 rounded transition-colors"
+                        className="btn btn-sm btn-ghost px-3 py-1 text-sm text-green-600 hover:bg-green-50 rounded transition-colors"
                       >
                         Resolve
                       </button>
@@ -364,7 +362,7 @@ const WarningMonitor = ({ userRole }) => {
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wider">Issued On</label>
-                  <p>{new Date(selectedWarning.createdAt).toLocaleString()}</p>
+                  <p>{displayDateTime(selectedWarning.createdAt)}</p>
                 </div>
                 <div>
                   <label className="text-xs text-gray-500 uppercase tracking-wider">Status</label>
@@ -377,7 +375,7 @@ const WarningMonitor = ({ userRole }) => {
                 {selectedWarning.resolvedAt && (
                   <div className="col-span-2">
                     <label className="text-xs text-gray-500 uppercase tracking-wider">Resolution</label>
-                    <p className="text-gray-700 mt-1">Resolved on {new Date(selectedWarning.resolvedAt).toLocaleString()}</p>
+                    <p className="text-gray-700 mt-1">Resolved on {displayDateTime(selectedWarning.resolvedAt)}</p>
                     {selectedWarning.resolutionNotes && (
                       <p className="text-sm text-gray-500 mt-1">Notes: {selectedWarning.resolutionNotes}</p>
                     )}
@@ -388,7 +386,7 @@ const WarningMonitor = ({ userRole }) => {
             <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end">
               <button
                 onClick={() => setShowDetails(false)}
-                className="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
+                className="btn btn-sm btn-ghost px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300"
               >
                 Close
               </button>
@@ -418,7 +416,7 @@ const WarningMonitor = ({ userRole }) => {
               <div key={idx} className="px-6 py-3 flex justify-between items-center hover:bg-gray-50">
                 <div className="flex-1">
                   <p className="text-sm font-medium text-gray-900">{log.subject || `Warning Email`}</p>
-                  <p className="text-xs text-gray-500">To: {log.to} • {new Date(log.sentAt).toLocaleString()}</p>
+                  <p className="text-xs text-gray-500">To: {log.to} • {displayDateTime(log.sentAt)}</p>
                 </div>
                 <div className="flex items-center space-x-3">
                   <span className={`px-2 py-1 text-xs rounded-full ${

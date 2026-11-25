@@ -4,8 +4,8 @@
   "description": "Spaceborn Management System - Unified Full-Stack Platform",
   "main": "backend/server.js",
   "scripts": {
-    "install:all": "npm install --prefix backend && npm install --prefix frontend",
-    "build": "npm install --prefix backend && npm install --prefix frontend && npm run build --prefix frontend",
+    "install:all": "npm ci --prefix backend && npm ci --prefix frontend",
+    "build": "npm run install:all && npm run build --prefix frontend",
     "start": "node backend/server.js",
     "seed": "node backend/seed.js",
     "dev:backend": "npm run dev --prefix backend",
@@ -21,5 +21,9 @@
     "pglite"
   ],
   "author": "Spaceborn Beyond Autonomous",
-  "license": "MIT"
+  "license": "MIT",
+  "packageManager": "npm@12.2.3",
+  "engines": {
+    "node": ">=26.13.1 <27"
+  }
 }

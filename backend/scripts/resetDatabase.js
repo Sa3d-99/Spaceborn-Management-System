@@ -5,7 +5,7 @@
 //   npm run db:reset -- --yes
 //
 // Uses DATABASE_URL if set (Render/Supabase), otherwise the local PGlite database.
-require('dotenv').config({ path: require('path').resolve(__dirname, '../.env') });
+require('../src/config/env');
 
 async function main() {
   if (!process.argv.includes('--yes')) {

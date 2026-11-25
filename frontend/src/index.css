@@ -1,6 +1,22 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "@fortawesome/fontawesome-svg-core/styles.css" layer(base);
+@config "../tailwind.config.js";
+@plugin "daisyui" {
+  themes: light --default;
+}
+
+@layer base {
+  /* Match the default border color used by existing Tailwind 3 layouts. */
+  *, ::before, ::after, ::backdrop, ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+@utility bg-opacity-50 {
+  &:where(.bg-black) {
+    background-color: --alpha(var(--color-black) / 50%);
+  }
+}
 
 @layer base {
   body {
@@ -41,54 +57,6 @@
 }
 
 @layer components {
-  /* Custom button styles */
-  .btn-primary {
-    @apply px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500 focus:ring-offset-2;
-  }
-
-  .btn-secondary {
-    @apply px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors focus:outline-none focus:ring-2 focus:ring-gray-400 focus:ring-offset-2;
-  }
-
-  .btn-danger {
-    @apply px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 focus:ring-offset-2;
-  }
-
-  /* Custom card styles */
-  .card {
-    @apply bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition-shadow;
-  }
-
-  /* Custom input styles */
-  .input-primary {
-    @apply w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent outline-none transition-all;
-  }
-
-  /* Custom badge styles */
-  .badge {
-    @apply px-2 py-1 text-xs font-medium rounded-full;
-  }
-
-  .badge-success {
-    @apply bg-green-100 text-green-700;
-  }
-
-  .badge-warning {
-    @apply bg-yellow-100 text-yellow-700;
-  }
-
-  .badge-danger {
-    @apply bg-red-100 text-red-700;
-  }
-
-  .badge-info {
-    @apply bg-blue-100 text-blue-700;
-  }
-
-  .badge-purple {
-    @apply bg-purple-100 text-purple-700;
-  }
-
   /* Google Drive Viewer specific styles */
   .drive-viewer {
     @apply bg-white rounded-xl shadow-sm border overflow-hidden;
@@ -150,23 +118,6 @@
 
   .empty-state-title {
     @apply text-gray-500 text-lg;
-  }
-
-  /* Toast notification */
-  .toast {
-    @apply fixed bottom-4 right-4 z-50;
-  }
-
-  .toast-success {
-    @apply px-4 py-3 rounded-lg shadow-lg text-white bg-green-600;
-  }
-
-  .toast-error {
-    @apply px-4 py-3 rounded-lg shadow-lg text-white bg-red-600;
-  }
-
-  .toast-info {
-    @apply px-4 py-3 rounded-lg shadow-lg text-white bg-blue-600;
   }
 
   /* Modal styles */

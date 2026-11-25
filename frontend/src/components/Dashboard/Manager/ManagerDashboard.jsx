@@ -423,7 +423,7 @@ const ManagerDashboard = () => {
             <select
               value={dateRange}
               onChange={(e) => setDateRange(e.target.value)}
-              className="px-2 py-1 text-sm border border-gray-200 rounded-lg"
+              className="select px-2 py-1 text-sm border border-gray-200 rounded-lg"
             >
               <option value="week">This Week</option>
               <option value="month">This Month</option>
@@ -599,7 +599,7 @@ const ManagerDashboard = () => {
         <p className="text-red-600">{error}</p>
         <button 
           onClick={fetchDashboardData}
-          className="mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
+          className="btn btn-sm btn-ghost mt-2 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700"
         >
           Retry
         </button>

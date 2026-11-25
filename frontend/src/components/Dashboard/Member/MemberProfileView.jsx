@@ -1,3 +1,6 @@
+import { Edit } from '../../Common/Icons';
+import { AlertCircle as IconAlertCircle, Camera as IconCamera, Check as IconCheck, Info as IconInfo } from '../../Common/Icons';
+import { displayDateTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Member/MemberProfileView.jsx
 import React, { useState } from 'react';
 import authService from '../../../services/authService';
@@ -62,7 +65,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
         role: formData.role,
         changes: changes,
         changeList: changeList,
-        timestamp: new Date().toLocaleString()
+        timestamp: displayDateTime(new Date())
       };
 
       // Store in localStorage for manager to see
@@ -135,18 +138,14 @@ const MemberProfileView = ({ userData, onUpdate }) => {
         <div className="p-6">
           {saved && (
             <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg flex items-center space-x-2 border border-green-200">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-              </svg>
+              <IconCheck className="w-5 h-5" />
               <span>Profile updated successfully! Your manager has been notified.</span>
             </div>
           )}
 
           {error && (
             <div className="mb-4 p-3 bg-red-50 text-red-700 rounded-lg flex items-center space-x-2 border border-red-200">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-              </svg>
+              <IconAlertCircle className="w-5 h-5" />
               <span>{error}</span>
             </div>
           )}
@@ -167,11 +166,8 @@ const MemberProfileView = ({ userData, onUpdate }) => {
               )}
               {isEditing && (
                 <label className="absolute bottom-0 right-0 w-6 h-6 bg-purple-600 rounded-full flex items-center justify-center cursor-pointer hover:bg-purple-700">
-                  <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
-                  </svg>
-                  <input type="file" className="hidden" accept="image/*" onChange={handleProfilePhotoChange} />
+                  <IconCamera className="w-3 h-3 text-white" />
+                  <input type="file" className="file-input hidden" accept="image/*" onChange={handleProfilePhotoChange} />
                 </label>
               )}
             </div>
@@ -184,9 +180,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
                   onClick={() => setIsEditing(true)}
                   className="mt-2 text-sm text-purple-600 hover:text-purple-700 flex items-center space-x-1"
                 >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
+                  <Edit className="w-4 h-4" />
                   <span>Edit Profile</span>
                 </button>
               )}
@@ -202,7 +196,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
                   type="text"
                   value={formData.name || ''}
                   onChange={(e) => handleInputChange('name', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               ) : (
                 <p className="text-gray-900">{formData?.name}</p>
@@ -216,7 +210,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
                   type="email"
                   value={formData.email || ''}
                   onChange={(e) => handleInputChange('email', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               ) : (
                 <p className="text-gray-900">{formData?.email}</p>
@@ -230,7 +224,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
                   type="tel"
                   value={formData.phone || ''}
                   onChange={(e) => handleInputChange('phone', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
+                  className="input w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500"
                 />
               ) : (
                 <p className="text-gray-900">{formData?.phone || 'Not provided'}</p>
@@ -271,14 +265,14 @@ const MemberProfileView = ({ userData, onUpdate }) => {
               <>
                 <button
                   onClick={handleCancel}
-                  className="px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
+                  className="btn btn-sm btn-ghost px-4 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={handleSave}
                   disabled={isSaving}
-                  className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
+                  className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 disabled:opacity-50 flex items-center space-x-2"
                 >
                   {isSaving ? (
                     <>
@@ -296,9 +290,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
           {isEditing && (
             <div className="mt-4 p-3 bg-blue-50 rounded-lg">
               <p className="text-xs text-blue-700 flex items-center space-x-2">
-                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
+                <IconInfo className="w-4 h-4" />
                 <span>Your manager will be notified of any changes made to your profile.</span>
               </p>
             </div>

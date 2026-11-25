@@ -1,3 +1,4 @@
+import { FileText as IconFileText, Search as IconSearch, Trash2 as IconTrash2, Upload as IconUpload } from './Icons';
 import React, { useState } from 'react';
 import { useGoogleLogin } from '@react-oauth/google';
 import googleDriveService from '../../services/googleDriveService';
@@ -92,15 +93,13 @@ const GoogleDriveViewer = () => {
       <div className="flex flex-col items-center justify-center min-h-[400px] p-8">
         <div className="text-center">
           <div className="w-20 h-20 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-10 h-10 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-            </svg>
+            <IconFileText className="w-10 h-10 text-purple-600" />
           </div>
           <h2 className="text-2xl font-bold text-gray-900 mb-2">Connect to Google Drive</h2>
           <p className="text-gray-500 mb-6">Access and manage employee documents securely</p>
           <button
             onClick={login}
-            className="px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
+            className="btn btn-sm btn-ghost px-6 py-3 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2 mx-auto"
           >
             <svg className="w-5 h-5" viewBox="0 0 24 24">
               <path fill="currentColor" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z" />
@@ -125,7 +124,7 @@ const GoogleDriveViewer = () => {
           </div>
           <button
             onClick={() => setUser(null)}
-            className="px-3 py-1 bg-white/20 text-white rounded-lg hover:bg-white/30"
+            className="btn btn-sm btn-ghost px-3 py-1 bg-white/20 text-white rounded-lg hover:bg-white/30"
           >
             Sign Out
           </button>
@@ -136,12 +135,10 @@ const GoogleDriveViewer = () => {
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <label className="cursor-pointer">
             <div className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 flex items-center space-x-2">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" />
-              </svg>
+              <IconUpload className="w-5 h-5" />
               <span>Upload File</span>
             </div>
-            <input type="file" onChange={handleFileUpload} className="hidden" disabled={uploading} />
+            <input type="file" onChange={handleFileUpload} className="file-input hidden" disabled={uploading} />
           </label>
 
           {uploading && (
@@ -157,11 +154,9 @@ const GoogleDriveViewer = () => {
               placeholder="Search files..."
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
-              className="pl-10 pr-4 py-2 border rounded-lg w-64"
+              className="input pl-10 pr-4 py-2 border rounded-lg w-64"
             />
-            <svg className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-            </svg>
+            <IconSearch className="absolute left-3 top-2.5 w-4 h-4 text-gray-400" />
           </div>
         </div>
       </div>
@@ -192,9 +187,7 @@ const GoogleDriveViewer = () => {
                     onClick={() => handleDeleteFile(file.id, file.name)}
                     className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-opacity"
                   >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                    </svg>
+                    <IconTrash2 className="w-5 h-5" />
                   </button>
                 </div>
                 <h3 className="font-medium text-gray-900 truncate" title={file.name}>{file.name}</h3>

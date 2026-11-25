@@ -22,9 +22,9 @@ router.get('/:id/has-role/:role', protect, hasRole);
 router.get('/:id', protect, authorize('CEO', 'COO', 'Manager'), getEmployee);
 router.put('/:id', protect, authorize('CEO', 'COO', 'Manager'), updateEmployee);
 router.post('/:id/reset-password', protect, authorize('CEO', 'COO', 'Manager'), resetPassword);
-router.post('/:id/deactivate', protect, authorize('CEO', 'COO', 'Manager'), deactivateEmployee);
+router.post('/:id/deactivate', protect, authorize('CEO', 'COO', 'Team Lead', 'HR', 'Coordinator'), deactivateEmployee);
 router.post('/:id/activate', protect, authorize('CEO', 'COO', 'Manager'), activateEmployee);
-router.delete('/:id', protect, authorize('CEO', 'COO', 'Manager'), deleteEmployee);
-router.post('/:id/terminate', protect, authorize('CEO', 'COO', 'Manager'), deleteEmployee);
+router.delete('/:id', protect, authorize('CEO', 'COO', 'Team Lead', 'HR', 'Coordinator'), deleteEmployee);
+router.post('/:id/terminate', protect, authorize('CEO', 'COO', 'Team Lead', 'HR', 'Coordinator'), deleteEmployee);
 
 module.exports = router;
