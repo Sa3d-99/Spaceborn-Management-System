@@ -32,8 +32,8 @@ router.post('/mark', protect, authorize('CEO', 'COO', 'Manager'), markAttendance
 // Mark leave as absent
 router.post('/mark-leave-absent', protect, authorize('CEO', 'COO', 'Manager'), markLeaveAbsent);
 
-// Roster attendance for CEO/Manager (computed: absent if not logged in, on-leave if approved leave)
-router.get('/roster', protect, getRosterAttendance);
+// Roster attendance for management and team leads (including approved leave).
+router.get('/roster', protect, authorize('CEO', 'COO', 'Manager', 'HR', 'Coordinator', 'Team Lead', 'CO Head', 'Co-Head'), getRosterAttendance);
 
 
 module.exports = router;

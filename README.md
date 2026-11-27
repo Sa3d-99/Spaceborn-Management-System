@@ -96,11 +96,13 @@ This project can be deployed as a unified web service with a managed PostgreSQL 
 | `DATABASE_URL` | PostgreSQL connection string. If omitted, uses local embedded PGlite. | `""` |
 | `JWT_SECRET` | Secret key for signing auth tokens | Required in production and Docker |
 | `JWT_EXPIRE` | Auth token duration | `"24h"` |
+| `REQUIRE_TWO_FACTOR_AUTH` | Require authenticator enrollment at the next sign-in | `false` |
+| `TWO_FACTOR_ENCRYPTION_KEY` | Stable server-only secret used to encrypt authenticator keys | Uses `JWT_SECRET` if unset |
 | `PG_POOL_MAX` | Maximum PostgreSQL connections opened by this service | `2` |
 | `APP_URL` | Public frontend origin used for links in email | Local Docker app URL |
 | `RESEND_API_KEY` | Server-side Resend sending key | |
 | `RESEND_FROM_EMAIL` | Sender address on a domain verified in Resend | |
-| `SIGNUP_ADMIN_EMAIL` | Inbox for signup review emails | First active CEO email |
+| `SIGNUP_ADMIN_EMAIL` | Optional inbox for signup review emails | Review emails disabled |
 | `TRUST_PROXY_HOPS` | Number of trusted reverse-proxy hops for client-IP rate limits | `0` |
 
 The frontend can be hosted separately on Vercel. In that case, set the Vercel
@@ -149,11 +151,11 @@ For a backend deployed on Vercel, set the Vercel project root directory to `back
 
 ## Resend email
 
-Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `APP_URL` in the root `.env`. Use a public HTTPS frontend origin when recipients open links from another device. Set `SIGNUP_ADMIN_EMAIL` if the review inbox differs from the first active CEO account. Start Compose with `./start.sh` to apply the settings.
+Set `RESEND_API_KEY`, `RESEND_FROM_EMAIL`, and `APP_URL` in the root `.env`. Use a public HTTPS frontend origin when recipients open links from another device. Set `SIGNUP_ADMIN_EMAIL` to receive signup review emails. The CEO can review saved requests from the dashboard when this address is blank or delivery fails. Start Compose with `./start.sh` to apply the settings.
 
 `Spaceborn Accounts <onboarding@resend.dev>` can send test mail to the Resend account's email address. To reach employee inboxes, set `RESEND_FROM_EMAIL` to an address on a domain verified for sending and use a key with permission for that domain. [Resend 403 guidance](https://resend.com/changelog/improved-logs-visibility)
 
-**Forgot password** is available from sign-in and directly at `/forgot-password`. The Spaceborn email includes a **Reset Password** button and a plain-text fallback. The link expires after 30 minutes and can be used once. The reset page validates the link before showing the password form and offers a fresh request when the link is invalid, expired, or used. A successful reset revokes older sessions. New passwords accept 15–128 characters and passphrases.
+**Forgot password** is available from sign-in and directly at `/forgot-password`. The Spaceborn email includes a **Reset Password** button and a plain-text fallback. The link expires after 15 minutes and can be used once. The reset page validates the link before showing the password form and offers a fresh request when the link is invalid, expired, or used. A successful reset revokes older sessions. New passwords accept 8–64 characters, including spaces.
 
 When the CEO approves a signup, Resend sends the applicant their employee ID and a **Create Password** button. The link expires after 30 minutes. Creating the password assigns the chosen department, then signs the new member in and opens **My Team**. In **Signup requests**, the CEO can resend an unfinished setup link, select **Approve again** if the linked employee account was removed, or delete the request record. Employee accounts are managed separately.
 
@@ -163,7 +165,7 @@ For a Vercel-hosted frontend, set the API's `APP_URL` to the frontend's public H
 
 The seeded users are demo data. To load your actual staff list:
 
-**From the web app (CEO / COO / Manager):** Employee Database → **Import from Excel** → choose the `.xlsx` or `.csv`. You get a preview showing who will be created, who already exists, and which rows have problems (missing/invalid email, duplicates). Click **Import**, then **Download login credentials** — each new employee gets a random temporary password that is shown only once.
+**From the web app (CEO, Director, Project Manager, or HR):** Open **Import from Excel** and choose an `.xlsx` or `.csv` of up to 5 MB and 2,000 employee rows. Review the preview and resolve any row errors. Click **Import** to save the valid rows and queue one-time password setup emails.
 
 **From the command line (bulk / first-time load, works against local PGlite or Render via `DATABASE_URL`):**
 
@@ -174,11 +176,11 @@ npm run import:employees -- ./employees.xlsx --commit         # write to the dat
 npm run import:employees -- ./employees.xlsx --commit --update  # also update existing employees
 ```
 
-The CLI writes `employee-credentials-<timestamp>.csv` next to the sheet (git-ignored). Share it privately, then delete it.
+The running CRM sends queued setup emails through the configured Resend sender. Check delivery status in Accounts, where an authorized administrator can resend an unfinished setup link.
 
 **Sheet format.** Only a name and an email column are required. Common headings are recognised automatically (`Employee Name`, `Official Email ID`, `Mobile No`, `Dept`, `Designation`, `Reporting Manager`, `Date of Joining`/`DOJ`, `DOB`, `Emp Code`, `Status`, …), title rows above the header are skipped, and unknown columns are kept under `additionalInfo`. Dates may be Excel dates, `DD/MM/YYYY` or `YYYY-MM-DD`; 10-digit phone numbers get a `+91` prefix.
 
-- **Role** column sets access. Spaceborn titles map to the app's permission levels. `CEO` → CEO, `Director` → COO, `Team Lead` → Team Lead, `Co-Lead` → CO Head, `Project Manager` → Manager, `HR` / `Coordinator` → HR, and `Intern` → Member. The app displays the Spaceborn titles. Without a Role column, the import can infer leadership from explicit designations and otherwise uses Intern.
+- **Role** column sets access. Spaceborn titles map to the app's permission levels. `CEO` → CEO, `Director` → COO, `Team Lead` → Team Lead, `Co-Lead` → CO Head, `Project Manager` → Manager, `HR` / `Coordinator` → HR, and `Intern` → Member. The app displays the Spaceborn titles. Without a Role column, new employees are imported as Interns.
 - **Employee ID** is optional; missing IDs are generated (`INT001`, `LD002`, `DIR001`, `PM001`, …) after the highest existing number.
 - Employees are matched by Employee ID, then email. Re-running the same sheet is safe: existing people are skipped unless `--update` / "Update employees that already exist" is chosen. Passwords are never changed by an update.
 - **Reporting Manager** (name, employee ID or email) is linked to that person's record when they exist in the system.

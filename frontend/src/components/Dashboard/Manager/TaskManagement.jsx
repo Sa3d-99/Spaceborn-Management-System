@@ -20,6 +20,7 @@ import {
   normalizeTaskList,
 } from '../../../utils/taskMapper';
 import { DEPARTMENTS } from '../../../utils/departments';
+import { roleLabel } from '../../../utils/roleLabels';
 
 const TaskManagement = ({ userRole = 'Manager' }) => {
   const [tasks, setTasks] = useState([]);
@@ -582,7 +583,7 @@ const TaskManagement = ({ userRole = 'Manager' }) => {
                     className="select w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                   >
                     <option value="">Select Employee</option>
-                    {employees.map(emp => <option key={emp.id ?? emp._id} value={emp.id ?? emp._id}>{emp.name} ({emp.department || emp.role})</option>)}
+                    {employees.map(emp => <option key={emp.id ?? emp._id} value={emp.id ?? emp._id}>{emp.name} ({emp.department || roleLabel(emp.role)})</option>)}
                   </select>
                 </div>
                 <div>

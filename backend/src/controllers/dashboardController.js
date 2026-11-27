@@ -644,27 +644,16 @@ exports.getTeamLeadStats = async (req, res) => {
   }
 };
 
-exports.submitTeamLeadDailyReport = async (req, res) => {
-  try {
-    const report = await Report.create({
-      userId: getId(req.user._id || req.user.id),
-      userName: req.user.name,
-      userRole: req.user.role,
-      department: req.user.department || '',
-      employeeId: req.user.employeeId,
-      date: businessDate(),
-      completedTasks: req.body.highlights || '',
-      ongoingWork: req.body.summary || '',
-      issuesFaced: req.body.challenges || '',
-      nextDayPlan: req.body.tomorrowPlan || '',
-      status: 'submitted',
-      submittedAt: new Date(),
-    });
-
-    res.status(201).json({ success: true, data: report });
-  } catch (error) {
-    res.status(500).json({ message: error.message || 'Failed to submit daily report' });
-  }
+exports.submitTeamLeadDailyReport = (req, res) => {
+  const body = req.body || {};
+  req.body = {
+    date: body.date ?? businessDate(),
+    completedTasks: body.completedTasks ?? body.highlights ?? '',
+    ongoingWork: body.ongoingWork ?? body.summary ?? '',
+    issuesFaced: body.issuesFaced ?? body.challenges ?? '',
+    nextDayPlan: body.nextDayPlan ?? body.tomorrowPlan ?? ''
+  };
+  return require('./reportController').submitReport(req, res);
 };
 
 exports.getTeamLeadMembers = async (req, res) => {

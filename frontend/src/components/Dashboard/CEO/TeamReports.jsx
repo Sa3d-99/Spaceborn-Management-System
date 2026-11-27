@@ -2,339 +2,44 @@ import { Search as IconSearch } from '../../Common/Icons';
 import { displayDate, displayTime } from '../../../utils/timeZone';
 // src/components/Dashboard/CEO/TeamReports.jsx
 import React, { useState, useEffect } from 'react';
-import reportService from '../../../services/reportService';
+import DailyReportReview from '../../Common/DailyReportReview';
 import roadmapService from '../../../services/roadmapService';
 import { DEPARTMENTS } from '../../../utils/departments';
 
 const CEOTeamReports = ({ userRole = 'CEO', department, user }) => {
-  const [reports, setReports] = useState([]);
   const [sharedRoadmaps, setSharedRoadmaps] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
   const [loading, setLoading] = useState(true);
   const [filterDepartment, setFilterDepartment] = useState('all');
-  const [departments, setDepartments] = useState([]);
-  const [dateFilter, setDateFilter] = useState('');
   const [selectedRoadmap, setSelectedRoadmap] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [searchTerm, setSearchTerm] = useState('');
   const [toast, setToast] = useState(null);
-  const [stats, setStats] = useState({
-    totalReports: 0,
-    totalEmployees: 0,
-    avgTasksPerDay: 0,
-    activeRoadmaps: 0,
-    avgProgress: 0,
-    pendingReviews: 0
-  });
+  const [roadmapError, setRoadmapError] = useState('');
 
   useEffect(() => {
-  fetchAllData();
-}, []);
-
-const fetchAllData = async () => {
-  setLoading(true);
-  try {
-    const reportsData = await reportService.getAllReports();
-    const safeReports = Array.isArray(reportsData) ? reportsData : [];
-    const roadmapsData = await roadmapService.getAllRoadmaps({ status: 'shared' });
-    const issuedRoadmaps = roadmapsData.length > 0 ? roadmapsData : getIssuedMockRoadmaps();
-    setReports(safeReports);
-    setSharedRoadmaps(issuedRoadmaps);
-    
-    setDepartments(DEPARTMENTS);
-    
-    const totalReportsCount = safeReports.length;
-    const totalEmployeesCount = [...new Set(safeReports.map(r => r.userId))].length;
-    const activeRoadmapsCount = issuedRoadmaps.filter(r => ['active', 'shared'].includes(r.status)).length;
-    const avgProgressValue = issuedRoadmaps.reduce((sum, r) => sum + (r.overallProgress || 0), 0) / issuedRoadmaps.length || 0;
-    
-    setStats({
-      totalReports: totalReportsCount,
-      totalEmployees: totalEmployeesCount,
-      avgTasksPerDay: 0,
-      activeRoadmaps: activeRoadmapsCount,
-      avgProgress: Math.round(avgProgressValue),
-      pendingReviews: safeReports.filter(r => !r.reviewed).length
-    });
-  } catch (error) {
-    console.error('Error:', error);
-    loadMockData();
-  } finally {
-    setLoading(false);
-  }
-};
+    if (activeTab !== 'mvp') return;
+    let current = true;
+    setLoading(true);
+    setRoadmapError('');
+    async function loadRoadmaps() {
+      const filters = { status: 'shared' };
+      try {
+        const roadmaps = await roadmapService.getAllRoadmaps(filters);
+        if (current) setSharedRoadmaps(roadmaps);
+      } catch (error) {
+        if (current) setRoadmapError(error.message || 'Could not load roadmaps.');
+      } finally {
+        if (current) setLoading(false);
+      }
+    }
+    loadRoadmaps();
+    return () => { current = false; };
+  }, [activeTab]);
 
   const showToastMessage = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const getIssuedMockRoadmaps = () => [
-    {
-      id: 1,
-      title: 'SpaceBorn CMS MVP Roadmap',
-      version: '2.1',
-      description: 'Complete roadmap for SpaceBorn CMS MVP development including core features, milestones, and delivery timeline.',
-      startDate: '2026-01-15',
-      targetDate: '2026-12-20',
-      lastUpdated: '2026-06-10T10:00:00Z',
-      status: 'active',
-      sharedBy: {
-        id: 'lead_001',
-        name: 'Priya Sharma',
-        role: 'Core Systems Lead',
-        email: 'priya.sharma@spaceborn.com',
-        avatar: 'PS'
-      },
-      sharedAt: '2026-06-10T10:00:00Z',
-      department: 'Core Systems',
-      overallProgress: 45,
-      milestones: [
-        { id: 1, title: 'Phase 1: Foundation', dueDate: '2026-03-15', status: 'completed', description: 'Basic setup and architecture', progress: 100 },
-        { id: 2, title: 'Phase 2: Core Features', dueDate: '2026-06-30', status: 'in-progress', description: 'Authentication, Dashboard, Content Management', progress: 65 },
-        { id: 3, title: 'Phase 3: Advanced Features', dueDate: '2026-09-30', status: 'planned', description: 'Analytics, AI Insights, Collaboration', progress: 20 },
-        { id: 4, title: 'Phase 4: Polish & Launch', dueDate: '2026-12-20', status: 'planned', description: 'Testing, Optimization, Deployment', progress: 0 }
-      ],
-      features: [
-        { id: 1, name: 'User Authentication', priority: 'high', status: 'completed' },
-        { id: 2, name: 'Dashboard UI', priority: 'high', status: 'completed' },
-        { id: 3, name: 'Content Management System', priority: 'high', status: 'in-progress' },
-        { id: 4, name: 'AI-Powered Insights', priority: 'medium', status: 'planned' }
-      ],
-      risks: [
-        { id: 1, description: 'Third-party API dependency', impact: 'high', mitigation: 'Have fallback strategy', status: 'monitoring' }
-      ]
-    },
-    {
-      id: 2,
-      title: 'Mobile App MVP Roadmap',
-      version: '1.0',
-      description: 'Mobile application development roadmap for iOS and Android platforms',
-      startDate: '2026-03-01',
-      targetDate: '2026-08-31',
-      lastUpdated: '2026-06-08T14:30:00Z',
-      status: 'active',
-      sharedBy: {
-        id: 'lead_002',
-        name: 'Anil Mehta',
-        role: 'Hardware & Integration Head',
-        email: 'anil.mehta@spaceborn.com',
-        avatar: 'AM'
-      },
-      sharedAt: '2026-06-08T14:30:00Z',
-      department: 'Hardware & Integration',
-      overallProgress: 30,
-      milestones: [
-        { id: 1, title: 'UI/UX Hardware & Integration', dueDate: '2026-04-15', status: 'completed', description: 'Complete mobile app designs', progress: 100 },
-        { id: 2, title: 'Development Setup', dueDate: '2026-05-30', status: 'completed', description: 'Setup development environment', progress: 100 },
-        { id: 3, title: 'Core Features', dueDate: '2026-07-15', status: 'in-progress', description: 'Implement core app features', progress: 45 }
-      ],
-      features: [
-        { id: 1, name: 'User Onboarding', priority: 'high', status: 'completed' },
-        { id: 2, name: 'Push Notifications', priority: 'high', status: 'in-progress' }
-      ],
-      risks: [
-        { id: 1, description: 'App store approval delays', impact: 'medium', mitigation: 'Submit early for review', status: 'monitoring' }
-      ]
-    }
-  ];
-
-  const loadMockData = () => {
-    // Mock reports data
-    const mockReports = [
-      {
-        id: 1,
-        userId: 'emp_001',
-        userName: 'Ravi Das',
-        userRole: 'Frontend Developer',
-        department: 'Core Systems',
-        employeeId: 'ENG001',
-        date: '2026-06-10',
-        completedTasks: '- Implemented login UI component\n- Fixed responsive layout issues\n- Updated authentication flow',
-        ongoingWork: 'Working on dashboard performance optimization',
-        issuesFaced: 'API rate limiting causing delays',
-        nextDayPlan: 'Complete integration with auth API',
-        submittedAt: '2026-06-10T16:30:00Z',
-        reviewed: false
-      },
-      {
-        id: 2,
-        userId: 'emp_002',
-        userName: 'Nisha Kumar',
-        userRole: 'Backend Developer',
-        department: 'Core Systems',
-        employeeId: 'ENG002',
-        date: '2026-06-10',
-        completedTasks: '- Database schema migration\n- API endpoint optimization\n- Cache layer implementation',
-        ongoingWork: 'Working on WebSocket integration',
-        issuesFaced: 'No major issues',
-        nextDayPlan: 'Complete real-time notifications',
-        submittedAt: '2026-06-10T17:00:00Z',
-        reviewed: false
-      },
-      {
-        id: 3,
-        userId: 'emp_003',
-        userName: 'Priya Sharma',
-        userRole: 'Core Systems Lead',
-        department: 'Core Systems',
-        employeeId: 'ENG003',
-        date: '2026-06-10',
-        completedTasks: '- Team sync meetings\n- Code review for 3 PRs\n- Sprint planning',
-        ongoingWork: 'Preparing Q3 roadmap',
-        issuesFaced: 'Resource allocation for new project',
-        nextDayPlan: 'Client demo preparation',
-        submittedAt: '2026-06-10T18:15:00Z',
-        reviewed: true
-      },
-      {
-        id: 4,
-        userId: 'emp_004',
-        userName: 'Pooja B',
-        userRole: 'UI Designer',
-        department: 'Hardware & Integration',
-        employeeId: 'DES001',
-        date: '2026-06-10',
-        completedTasks: '- Dashboard mockups\n- Hardware & Integration system updates\n- Icon set creation',
-        ongoingWork: 'Mobile app designs',
-        issuesFaced: 'Hardware & Integration tool compatibility',
-        nextDayPlan: 'Complete user flow diagrams',
-        submittedAt: '2026-06-10T16:45:00Z',
-        reviewed: false
-      },
-      {
-        id: 5,
-        userId: 'emp_005',
-        userName: 'Anil Mehta',
-        userRole: 'Hardware & Integration Lead',
-        department: 'Hardware & Integration',
-        employeeId: 'DES002',
-        date: '2026-06-10',
-        completedTasks: '- Hardware & Integration review sessions\n- Client feedback integration\n- Team mentorship',
-        ongoingWork: 'Hardware & Integration system documentation',
-        issuesFaced: 'Feedback delays from client',
-        nextDayPlan: 'Finalize design assets',
-        submittedAt: '2026-06-10T17:30:00Z',
-        reviewed: false
-      }
-    ];
-    setReports(mockReports);
-    
-    setDepartments(DEPARTMENTS);
-    
-    // Mock roadmaps data
-    const mockRoadmaps = [
-      {
-        id: 1,
-        title: 'SpaceBorn CMS MVP Roadmap',
-        version: '2.1',
-        description: 'Complete roadmap for SpaceBorn CMS MVP development including core features, milestones, and delivery timeline.',
-        startDate: '2026-01-15',
-        targetDate: '2026-12-20',
-        lastUpdated: '2026-06-10T10:00:00Z',
-        status: 'active',
-        sharedBy: {
-          id: 'lead_001',
-          name: 'Priya Sharma',
-          role: 'Core Systems Lead',
-          email: 'priya.sharma@spaceborn.com',
-          avatar: 'PS'
-        },
-        sharedAt: '2026-06-10T10:00:00Z',
-        department: 'Core Systems',
-        overallProgress: 45,
-        milestones: [
-          { id: 1, title: 'Phase 1: Foundation', dueDate: '2026-03-15', status: 'completed', description: 'Basic setup and architecture', progress: 100 },
-          { id: 2, title: 'Phase 2: Core Features', dueDate: '2026-06-30', status: 'in-progress', description: 'Authentication, Dashboard, Content Management', progress: 65 },
-          { id: 3, title: 'Phase 3: Advanced Features', dueDate: '2026-09-30', status: 'planned', description: 'Analytics, AI Insights, Collaboration', progress: 20 },
-          { id: 4, title: 'Phase 4: Polish & Launch', dueDate: '2026-12-20', status: 'planned', description: 'Testing, Optimization, Deployment', progress: 0 }
-        ],
-        features: [
-          { id: 1, name: 'User Authentication', priority: 'high', status: 'completed' },
-          { id: 2, name: 'Dashboard UI', priority: 'high', status: 'completed' },
-          { id: 3, name: 'Content Management System', priority: 'high', status: 'in-progress' },
-          { id: 4, name: 'AI-Powered Insights', priority: 'medium', status: 'planned' }
-        ],
-        risks: [
-          { id: 1, description: 'Third-party API dependency', impact: 'high', mitigation: 'Have fallback strategy', status: 'monitoring' }
-        ]
-      },
-      {
-        id: 2,
-        title: 'Mobile App MVP Roadmap',
-        version: '1.0',
-        description: 'Mobile application development roadmap for iOS and Android platforms',
-        startDate: '2026-03-01',
-        targetDate: '2026-08-31',
-        lastUpdated: '2026-06-08T14:30:00Z',
-        status: 'active',
-        sharedBy: {
-          id: 'lead_002',
-          name: 'Anil Mehta',
-          role: 'Hardware & Integration Head',
-          email: 'anil.mehta@spaceborn.com',
-          avatar: 'AM'
-        },
-        sharedAt: '2026-06-08T14:30:00Z',
-        department: 'Hardware & Integration',
-        overallProgress: 30,
-        milestones: [
-          { id: 1, title: 'UI/UX Hardware & Integration', dueDate: '2026-04-15', status: 'completed', description: 'Complete mobile app designs', progress: 100 },
-          { id: 2, title: 'Development Setup', dueDate: '2026-05-30', status: 'completed', description: 'Setup development environment', progress: 100 },
-          { id: 3, title: 'Core Features', dueDate: '2026-07-15', status: 'in-progress', description: 'Implement core app features', progress: 45 }
-        ],
-        features: [
-          { id: 1, name: 'User Onboarding', priority: 'high', status: 'completed' },
-          { id: 2, name: 'Push Notifications', priority: 'high', status: 'in-progress' }
-        ],
-        risks: [
-          { id: 1, description: 'App store approval delays', impact: 'medium', mitigation: 'Submit early for review', status: 'monitoring' }
-        ]
-      }
-    ];
-    setSharedRoadmaps(mockRoadmaps);
-    
-    // Calculate stats
-    const totalReportsCount = mockReports.length;
-    const totalEmployeesCount = [...new Set(mockReports.map(r => r.userId))].length;
-    const avgTasks = (mockReports.reduce((sum, r) => {
-      const taskCount = r.completedTasks?.split('\n').filter(t => t.trim()).length || 1;
-      return sum + taskCount;
-    }, 0) / totalReportsCount || 0).toFixed(1);
-    
-    const activeRoadmapsCount = mockRoadmaps.filter(r => ['active', 'shared'].includes(r.status)).length;
-    const avgProgressValue = mockRoadmaps.reduce((sum, r) => sum + (r.overallProgress || 0), 0) / mockRoadmaps.length || 0;
-    
-    setStats({
-      totalReports: totalReportsCount,
-      totalEmployees: totalEmployeesCount,
-      avgTasksPerDay: avgTasks,
-      activeRoadmaps: activeRoadmapsCount,
-      avgProgress: Math.round(avgProgressValue),
-      pendingReviews: mockReports.filter(r => !r.reviewed).length
-    });
-    
-    setLoading(false);
-  };
-
-  const getFilteredReports = () => {
-    let filtered = [...reports];
-    
-    if (filterDepartment !== 'all') {
-      filtered = filtered.filter(r => r.department === filterDepartment);
-    }
-    
-    if (dateFilter) {
-      filtered = filtered.filter(r => r.date === dateFilter);
-    }
-    
-    const grouped = filtered.reduce((acc, report) => {
-      if (!acc[report.date]) acc[report.date] = [];
-      acc[report.date].push(report);
-      return acc;
-    }, {});
-    
-    return grouped;
   };
 
   const getFilteredRoadmaps = () => {
@@ -424,11 +129,9 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
     );
   };
 
-  const filteredGroupedReports = getFilteredReports();
-  const sortedDates = Object.keys(filteredGroupedReports).sort((a, b) => new Date(b) - new Date(a));
   const filteredRoadmaps = getFilteredRoadmaps();
 
-  if (loading) {
+  if (activeTab === 'mvp' && loading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
@@ -452,81 +155,6 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
           </div>
         </div>
       )}
-
-      {/* Stats Dashboard */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Reports</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalReports}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">📊</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active Reporters</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalEmployees}</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">👥</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Avg Tasks/Day</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.avgTasksPerDay}</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">✅</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active Roadmaps</p>
-              <p className="text-2xl font-bold text-purple-600">{stats.activeRoadmaps}</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">🗺️</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Avg MVP Progress</p>
-              <p className="text-2xl font-bold text-green-600">{stats.avgProgress}%</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">🎯</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending Reviews</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.pendingReviews}</p>
-            </div>
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">⏳</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -556,9 +184,9 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
               <span className="flex items-center space-x-2">
                 <span>🚀</span>
                 <span>MVP Roadmaps</span>
-                {stats.activeRoadmaps > 0 && (
+                {sharedRoadmaps.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
-                    {stats.activeRoadmaps}
+                    {sharedRoadmaps.length}
                   </span>
                 )}
               </span>
@@ -568,7 +196,7 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
       </div>
 
       {/* Filter Bar */}
-      <div className="bg-white rounded-xl shadow-sm border p-4">
+      {activeTab === 'mvp' && <div className="bg-white rounded-xl shadow-sm border p-4">
         <div className="flex flex-wrap gap-4 items-center justify-between">
           <div className="flex items-center space-x-3">
             <span className="text-sm text-gray-500">Filter by:</span>
@@ -578,30 +206,11 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
               className="select px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
             >
               <option value="all">All Departments</option>
-              {departments.map(dept => (
+              {DEPARTMENTS.map(dept => (
                 <option key={dept} value={dept}>{dept}</option>
               ))}
             </select>
           </div>
-          
-          {activeTab === 'daily' && (
-            <div className="flex items-center space-x-3">
-              <input
-                type="date"
-                value={dateFilter}
-                onChange={(e) => setDateFilter(e.target.value)}
-                className="input px-3 py-1.5 border border-gray-300 rounded-lg text-sm focus:ring-2 focus:ring-purple-500"
-              />
-              {dateFilter && (
-                <button
-                  onClick={() => setDateFilter('')}
-                  className="btn btn-sm btn-ghost px-3 py-1.5 text-sm text-red-600 hover:bg-red-50 rounded-lg"
-                >
-                  Clear
-                </button>
-              )}
-            </div>
-          )}
           
           {activeTab === 'mvp' && (
             <div className="flex-1 max-w-md">
@@ -618,54 +227,10 @@ ${roadmap.attachments?.length ? roadmap.attachments.map(a => `- ${a.name} (${for
             </div>
           )}
         </div>
-      </div>
+      </div>}
 
-      {/* Daily Reports Tab */}
-      {activeTab === 'daily' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4">
-            <h2 className="text-xl font-semibold text-white">Daily Reports Overview</h2>
-            <p className="text-purple-100 text-sm mt-1">Complete visibility into all team members' daily submissions</p>
-          </div>
-          
-          <div className="divide-y divide-gray-100">
-            {sortedDates.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="text-6xl mb-4">📭</div>
-                <p className="text-gray-500">No daily reports found</p>
-              </div>
-            ) : (
-              sortedDates.map((date) => (
-                <div key={date} className="p-6">
-                  <h3 className="font-semibold text-lg text-gray-900 mb-4">
-                    {displayDate(date, 'en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
-                  </h3>
-                  <div className="space-y-4">
-                    {filteredGroupedReports[date]?.map((report) => (
-                      <div key={report.id} className="border rounded-xl p-5 bg-gray-50">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <span className="font-semibold text-gray-900">{report.userName}</span>
-                            <span className="text-sm text-gray-500 ml-2">({report.userRole})</span>
-                            <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">{report.department}</span>
-                          </div>
-                          <span className="text-xs text-gray-400">{displayTime(report.submittedAt)}</span>
-                        </div>
-                        <div className="text-sm text-gray-600">
-                          <p><span className="font-medium">✅ Completed:</span> {report.completedTasks}</p>
-                          {report.ongoingWork && <p className="mt-2"><span className="font-medium">🔄 Ongoing:</span> {report.ongoingWork}</p>}
-                          {report.issuesFaced && <p className="mt-2"><span className="font-medium">⚠️ Issues:</span> {report.issuesFaced}</p>}
-                          {report.nextDayPlan && <p className="mt-2"><span className="font-medium">📅 Next Plan:</span> {report.nextDayPlan}</p>}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'daily' && <DailyReportReview />}
+      {activeTab === 'mvp' && roadmapError && <p className="alert alert-error" role="alert">{roadmapError}</p>}
 
       {/* MVP Roadmaps Tab */}
       {activeTab === 'mvp' && (

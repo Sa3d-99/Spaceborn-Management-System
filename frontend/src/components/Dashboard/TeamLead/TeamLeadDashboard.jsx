@@ -1,29 +1,23 @@
 import { Send as IconSend, X as IconX } from '../../Common/Icons';
-import { displayDate } from '../../../utils/timeZone';
+import { businessDate, displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/TeamLead/TeamLeadDashboard.js
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import authService from '../../../services/authService';
 import { roleLabel } from '../../../utils/roleLabels';
+import useDashboardData from '../useDashboardData';
 
-const TeamLeadDashboard = () => {
-  const [teamLeadData, setTeamLeadData] = useState({
-    name: '',
-    initials: '',
-    role: '',
-    title: '',
-    description: '',
-    openTasks: 0,
-    overdueTasks: 0,
-    inProgress: 0,
-    blocked: 0,
-    completedThisWeek: 0,
-    blockedTasks: [],
-    teamMembers: [],
-    dailySummaries: []
-  });
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+const TeamLeadDashboard = ({ user }) => {
+  const { data, error, reload } = useDashboardData('/dashboard/team-lead', 'Could not load the dashboard.');
+  const teamLeadData = {
+    ...(data || {}),
+    name: user.name,
+    role: user.role,
+    initials: user.name?.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join(''),
+    title: [user.designation, user.department].filter(Boolean).join(' · '),
+    blockedTasks: data?.blockedTasks || [],
+    teamMembers: data?.teamMembers || [],
+    dailySummaries: data?.dailySummaries || []
+  };
   const [selectedMember, setSelectedMember] = useState(null);
   const [showMemberModal, setShowMemberModal] = useState(false);
   const [sendingReport, setSendingReport] = useState(false);
@@ -34,106 +28,6 @@ const TeamLeadDashboard = () => {
     challenges: '',
     tomorrowPlan: ''
   });
-
-  // Fetch team lead dashboard data - DIRECTLY LOAD MOCK DATA FIRST
-  useEffect(() => {
-    // Load mock data immediately for testing
-    loadMockData();
-    
-    // Try to fetch from API if available
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    try {
-      const token = authService.getToken();
-      const currentUser = authService.getCurrentUser();
-      
-      if (!token || !currentUser) {
-        console.log('No auth token, using mock data');
-        return;
-      }
-
-      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-      
-      // Try to fetch profile
-      try {
-        const profileResponse = await fetch(`${API_BASE_URL}/team-lead/profile`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (profileResponse.ok) {
-          const profile = await profileResponse.json();
-          setTeamLeadData(prev => ({
-            ...prev,
-            name: profile.name,
-            initials: profile.initials,
-            title: profile.title,
-            description: profile.description
-          }));
-        }
-      } catch (err) {   
-        console.log('Profile fetch failed, using mock');
-      }
-
-      // Try to fetch stats
-      try {
-        const statsResponse = await fetch(`${API_BASE_URL}/team-lead/stats`, {
-          headers: { 'Authorization': `Bearer ${token}` }
-        });
-        if (statsResponse.ok) {
-          const stats = await statsResponse.json();
-          setTeamLeadData(prev => ({
-            ...prev,
-            openTasks: stats.openTasks,
-            overdueTasks: stats.overdueTasks,
-            inProgress: stats.inProgress,
-            blocked: stats.blocked,
-            completedThisWeek: stats.completedThisWeek
-          }));
-        }
-      } catch (err) {
-        console.log('Stats fetch failed, using mock');
-      }
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-    }
-  };
-
-  // Mock data for development - DIRECT DATA
-  const loadMockData = () => {
-    const currentUser = authService.getCurrentUser();
-    
-    setTeamLeadData({
-      name: currentUser?.name || 'Priya Sharma',
-      initials: currentUser?.name?.split(' ').map(n => n[0]).join('') || 'PS',
-      role: 'Team Lead',
-      title: 'Sr. Engineer — Team Lead · Core Systems',
-      description: 'Leading the Core Systems team with a focus on delivery excellence, mentoring, and maintaining technical standards across all projects.',
-      openTasks: 19,
-      overdueTasks: 5,
-      inProgress: 7,
-      blocked: 1,
-      completedThisWeek: 11,
-      blockedTasks: [
-        { id: 1, title: 'DB Schema Hardware & Integration', status: 'Overdue', priority: 'high', assignedTo: 'Suresh M', dueDate: '2026-05-24' },
-        { id: 2, title: 'API Gateway Configuration', status: 'Blocked', priority: 'high', assignedTo: 'Nisha Kumar', dueDate: '2026-06-07' }
-      ],
-      teamMembers: [
-        { id: 1, initials: 'RD', name: 'Ravi Das', role: 'Software Engineer', email: 'ravi.das@spaceborn.com', tasksCompleted: 12, tasksInProgress: 2, tasks: 1 },
-        { id: 2, initials: 'NK', name: 'Nisha Kumar', role: 'DevOps Engineer', email: 'nisha.kumar@spaceborn.com', tasksCompleted: 8, tasksInProgress: 3, tasks: 1 },
-        { id: 3, initials: 'AM', name: 'Anil Mehta', role: 'Frontend Developer', email: 'anil.mehta@spaceborn.com', tasksCompleted: 15, tasksInProgress: 1, tasks: 0 },
-        { id: 4, initials: 'PB', name: 'Pooja B', role: 'UI/UX Designer', email: 'pooja.b@spaceborn.com', tasksCompleted: 10, tasksInProgress: 2, tasks: 0 },
-        { id: 5, initials: 'AS', name: 'Arjun Singh', role: 'Backend Developer', email: 'arjun.singh@spaceborn.com', tasksCompleted: 9, tasksInProgress: 3, tasks: 0 }
-      ],
-      dailySummaries: [
-        { id: 1, initials: 'RD', name: 'Ravi Das', summary: 'Login UI 74% complete. Auth API integration started. Waiting on backend endpoint.', date: '2026-06-08' },
-        { id: 2, initials: 'NK', name: 'Nisha Kumar', summary: 'Fixed 3 critical bugs in payment module. Unit tests pending. On track.', date: '2026-06-08' },
-        { id: 3, initials: 'AS', name: 'Arjun Singh', summary: 'DB migration done. Query performance up 40%. Schema updates next sprint.', date: '2026-06-08' }
-      ]
-    });
-    setIsLoading(false);
-  };
 
   const formatDate = (dateString) => {
     if (!dateString) return 'N/A';
@@ -153,7 +47,7 @@ const TeamLeadDashboard = () => {
         teamLeadId: currentUser?.id,
         teamLeadName: currentUser?.name,
         department: currentUser?.department,
-        date: new Date().toISOString(),
+        date: businessDate(),
         summary: reportData.summary,
         highlights: reportData.highlights,
         challenges: reportData.challenges,
@@ -170,26 +64,6 @@ const TeamLeadDashboard = () => {
         teamSummaries: teamLeadData.dailySummaries
       };
       
-      if (!token || process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        console.log('📧 Daily Report Sent to CEO:', reportPayload);
-        
-        // Store in localStorage for demo
-        const sentReports = JSON.parse(localStorage.getItem('sent_daily_reports') || '[]');
-        sentReports.unshift({
-          id: Date.now(),
-          ...reportPayload,
-          sentAt: new Date().toISOString()
-        });
-        localStorage.setItem('sent_daily_reports', JSON.stringify(sentReports));
-        
-        alert(`✅ Daily report sent to CEO successfully!\n\nReport includes:\n- ${teamLeadData.dailySummaries.length} team summaries\n- ${teamLeadData.openTasks} open tasks\n- ${teamLeadData.completedThisWeek} completed this week`);
-        
-        setShowSendModal(false);
-        setReportData({ summary: '', highlights: '', challenges: '', tomorrowPlan: '' });
-        setSendingReport(false);
-        return;
-      }
-      
       const response = await fetch(`${API_BASE_URL}/team-lead/daily-report`, {
         method: 'POST',
         headers: {
@@ -199,18 +73,17 @@ const TeamLeadDashboard = () => {
         body: JSON.stringify(reportPayload)
       });
       
-      if (response.ok) {
-        const result = await response.json();
-        alert(`✅ Daily report sent to CEO successfully!`);
-        setShowSendModal(false);
-        setReportData({ summary: '', highlights: '', challenges: '', tomorrowPlan: '' });
-      } else {
-        throw new Error('Failed to send report');
+      const result = await response.json();
+      if (!response.ok || result.success === false) {
+        throw new Error(result.message || 'Could not send the daily report. Try again.');
       }
-      
+
+      alert(result.message || 'Daily report sent.');
+      setShowSendModal(false);
+      setReportData({ summary: '', highlights: '', challenges: '', tomorrowPlan: '' });
+      reload();
     } catch (error) {
-      console.error('Error sending report:', error);
-      alert('❌ Failed to send report. Please try again.');
+      alert(error.message);
     } finally {
       setSendingReport(false);
     }
@@ -219,13 +92,10 @@ const TeamLeadDashboard = () => {
   // Get active members count
   const activeMembers = teamLeadData.teamMembers.filter(m => m.tasksInProgress > 0 || m.tasks > 0).length;
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-purple-600"></div>
-      </div>
-    );
-  }
+  if (error) return <div className="alert alert-error" role="alert">{error}
+    <button className="btn btn-sm" onClick={reload}>Try again</button>
+  </div>;
+  if (!data) return <p role="status">Loading dashboard…</p>;
 
   return (
     <div className="space-y-6">

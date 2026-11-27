@@ -138,6 +138,12 @@ test('reset emails use a single-use token and successful reset revokes old sessi
   assert.equal((await request('/me', { token: session })).status, 401);
   assert.equal((await request('/login', { body: credentials })).status, 401);
   assert.equal((await request('/login', { body: { ...credentials, password: newPassword } })).status, 200);
+  const stored = await User.findById(user.id);
+  assert.match(stored.password, /^\$2/);
+  assert.ok(sentEmails.some(email => email.subject === 'Your Spaceborn password was reset' &&
+    [].concat(email.to).includes(user.email) && !email.text.includes(newPassword)));
+  const { rows } = await database.query("SELECT data FROM notifications WHERE data->>'userId' = $1", [user.id]);
+  assert.equal(rows.filter(row => row.data.title === 'Password reset completed').length, 1);
 });
 
 test('a reset request by email sends matching links in the branded button and text fallback', async () => {
@@ -161,6 +167,11 @@ test('link validation rejects malformed, unknown, and expired reset tokens', asy
   assert.equal(result.status, 202);
   const token = await getDeliveredToken(user.email);
 
+  const { rows: [expiry] } = await database.query(`
+    SELECT EXTRACT(EPOCH FROM (password_reset_expires_at - password_reset_requested_at)) AS seconds FROM users WHERE id = $1
+  `, [user.id]);
+  assert.equal(Number(expiry.seconds), 15 * 60);
+
   await assertInvalidLink('malformed');
   await assertInvalidLink('0'.repeat(64));
 
@@ -173,16 +184,20 @@ test('link validation rejects malformed, unknown, and expired reset tokens', asy
   assert.equal(await (await User.findById(user.id)).comparePassword(originalPassword), true);
 });
 
-test('unknown and inactive accounts receive the same public response as an active account', async () => {
+test('only active registered accounts receive a reset email and all requests get the same acknowledgement', async () => {
   const active = await createAccount('INT981');
   const inactive = await createAccount('INT982', false);
+  const count = sentEmails.length;
   const known = await request('/forgot-password', { body: { employeeId: active.employeeId } });
 
-  assert.deepEqual(await request('/forgot-password', { body: { employeeId: 'INT999' } }), known);
-  assert.deepEqual(await request('/forgot-password', { body: { employeeId: inactive.employeeId } }), known);
   assert.equal(known.status, 202);
-  await getDeliveredToken(active.email);
-  assert.ok(!sentEmails.some(({ to }) => [].concat(to).includes(inactive.email)));
+  assert.equal(known.body.message,
+    'Request received. Only active, registered CRM accounts receive a reset link at their saved email address.');
+  for (const identifier of ['unknown@example.test', 'INT999', inactive.email]) {
+    const result = await request('/forgot-password', { body: { employeeId: identifier } });
+    assert.deepEqual(result, known);
+  }
+  assert.deepEqual(sentEmails.slice(count).map(({ to }) => to), [[active.email]]);
 });
 
 test('the old immediate reset route leaves the account password intact and requires email proof', async () => {
@@ -193,4 +208,19 @@ test('the old immediate reset route leaves the account password intact and requi
   assert.equal(await (await User.findById(user._id)).comparePassword(originalPassword), true);
   assert.equal(response.status, 202);
   await getDeliveredToken(user.email);
+});
+
+test('only three hourly requests per account are accepted, and only the newest link works', async () => {
+  const user = await createAccount('INT987');
+  for (const identifier of [user.employeeId, user.employeeId.toLowerCase(), user.email]) {
+    assert.equal((await request('/forgot-password', { body: { employeeId: identifier } })).status, 202);
+  }
+  assert.equal((await request('/forgot-password', { body: { employeeId: user.email.toUpperCase() } })).status, 429);
+  const links = sentEmails.filter(email => [].concat(email.to).includes(user.email));
+  assert.equal(links.length, 3);
+  assert.match(links[2].text, /15 minutes/);
+  const tokens = links.map(email => new URLSearchParams(new URL(getResetLink(email)).hash.slice(1)).get('token'));
+  await assertInvalidLink(tokens[0]);
+  await assertInvalidLink(tokens[1]);
+  assert.equal((await request('/reset-password/validate', { body: { token: tokens[2] } })).status, 200);
 });

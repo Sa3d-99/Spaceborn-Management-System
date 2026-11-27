@@ -121,7 +121,7 @@ test('public signup requires CEO approval and emailed password setup before logi
   const approval = await request(action, { token: ceoToken, body: {} });
   assert.equal(approval.status, 200);
   const { employeeId, emailSent } = approval.body.data;
-  assert.ok(employeeId, 'Approval returns the assigned employee ID');
+  assert.match(employeeId, /^INT\d{3,}$/, 'Signup approval uses the shared Intern ID format');
   assert.equal(emailSent, true);
   assert.equal((await request('/login', { body: { employeeId, password } })).status, 401);
   assert.equal((await User.findOne({ email: applicant.email })).department, undefined);
@@ -202,6 +202,54 @@ test('a failed setup email leaves the signup approved and can be resent', async 
   const completed = await request(`${action}/resend`, adminAction);
   assert.equal(completed.status, 409);
   assert.match(completed.body.message, /already created a password/i);
+});
+
+test('signup skips admin email when the review inbox is unset and still supports approval', async t => {
+  const applicant = { name: 'No Inbox Applicant', email: 'no-inbox@example.test', department: 'Sensor Stack' };
+  const adminEmail = process.env.SIGNUP_ADMIN_EMAIL;
+  t.after(() => { process.env.SIGNUP_ADMIN_EMAIL = adminEmail; });
+  delete process.env.SIGNUP_ADMIN_EMAIL;
+
+  assert.equal((await request('/signup', { body: applicant })).status, 202);
+  const pending = await request('/signup-requests', { token: ceoToken });
+  const queued = pending.body.data.find(entry => entry.email === applicant.email);
+  assert.equal(queued?.status, 'pending');
+  assert.ok(!emails.some(message => message.text.includes(applicant.email)));
+
+  const approval = await request(`/signup-requests/${queued.id}/approve`, { token: ceoToken, body: {} });
+  assert.equal(approval.status, 200);
+  assert.equal(approval.body.data.emailSent, true);
+  assert.ok(await User.findOne({ email: applicant.email }));
+});
+
+test('email delivery and setup cleanup failures leave the signup and approval successful', async t => {
+  const applicant = { name: 'Delivery Failure Applicant', email: 'delivery-failure@example.test', department: 'Sensor Stack' };
+  const adminEmail = process.env.SIGNUP_ADMIN_EMAIL;
+  rejectedRecipients.add(adminEmail);
+  rejectedRecipients.add(applicant.email);
+  t.after(() => {
+    rejectedRecipients.delete(adminEmail);
+    rejectedRecipients.delete(applicant.email);
+  });
+
+  assert.equal((await request('/signup', { body: applicant })).status, 202);
+  assert.ok(emails.some(message => recipientMatches(message, adminEmail) && message.text.includes(applicant.email)));
+  const pending = await request('/signup-requests', { token: ceoToken });
+  const queued = pending.body.data.find(entry => entry.email === applicant.email);
+  assert.equal(queued?.status, 'pending');
+
+  const query = database.query.bind(database);
+  t.mock.method(database, 'query', (sql, params) => {
+    if (sql.startsWith('UPDATE users SET password_reset_digest = NULL')) {
+      throw new Error('Test setup email cleanup failure');
+    }
+    return query(sql, params);
+  });
+
+  const approval = await request(`/signup-requests/${queued.id}/approve`, { token: ceoToken, body: {} });
+  assert.equal(approval.status, 200);
+  assert.equal(approval.body.data.emailSent, false);
+  assert.equal((await User.findOne({ email: applicant.email })).employeeId, approval.body.data.employeeId);
 });
 
 test('concurrent requests for the same email produce one pending signup and one admin email', async () => {

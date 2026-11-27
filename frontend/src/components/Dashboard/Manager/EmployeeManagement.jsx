@@ -1,16 +1,8 @@
-import { Upload } from '../../Common/Icons';
-import { Folder as IconFolder, Plus as IconPlus, Search as IconSearch } from '../../Common/Icons';
-import { businessDate, displayDateTime } from '../../../utils/timeZone';
-import { resetEmployeePassword } from '../CEO/employeeClient';
-import authService from '../../../services/authService';
-// src/components/Dashboard/Manager/EmployeeManagement.jsx
+import { Upload, Folder as IconFolder, Plus as IconPlus, Search as IconSearch } from '../../Common/Icons';
+import { displayDateTime } from '../../../utils/timeZone';
 import React, { useState } from 'react';
 import { DEPARTMENTS, normalizeDepartment } from '../../../utils/departments';
-import { 
-  employeeMasterData, 
-  addEmployee,
-  getEmployeeStats
-} from '../../../data/employeeData';
+import EmployeeForm from '../EmployeeForm';
 import employeeService from '../../../services/employeeService';
 import { useGoogleLogin } from '@react-oauth/google';
 import ImportEmployeesModal from './ImportEmployeesModal';
@@ -19,8 +11,6 @@ import { roleLabel } from '../../../utils/roleLabels';
 const EmployeeManagement = ({ 
   employees = [], 
   userRole, 
-  accessLevel, 
-  userDepartment, 
   canEdit, 
   canDelete, 
   canAdd,
@@ -35,31 +25,16 @@ const EmployeeManagement = ({
   const [selectedEmployee, setSelectedEmployee] = useState(null);
   const [showEmployeeModal, setShowEmployeeModal] = useState(false);
   const [showAddEmployeeModal, setShowAddEmployeeModal] = useState(false);
+  const [editingEmployee, setEditingEmployee] = useState(null);
   const [showImportModal, setShowImportModal] = useState(false);
   const [showDocumentUpload, setShowDocumentUpload] = useState(false);
   const [uploadingDocType, setUploadingDocType] = useState('');
   const [activeTab, setActiveTab] = useState('personal');
   const [driveToken, setDriveToken] = useState(null);
   const [uploadProgress, setUploadProgress] = useState(null);
-  const [newEmployee, setNewEmployee] = useState({
-    name: '',
-    email: '',
-    phone: '',
-    department: '',
-    designation: '',
-    role: 'Member',
-    dateOfBirth: '',
-    gender: '',
-    bloodGroup: '',
-    nationality: 'Indian',
-    address: { street: '', city: '', state: '', zipCode: '', country: 'India' },
-    emergencyContact: { name: '', relation: '', phone: '' },
-    education: { college: '', degree: '', specialization: '', graduationYear: '', cgpa: '' },
-    skills: [],
-    joinDate: businessDate(),
-    workLocation: 'Remote',
-    bankDetails: { accountNumber: '', ifscCode: '', bankName: '', accountHolderName: '' }
-  });
+  const [detailError, setDetailError] = useState('');
+  const [feedback, setFeedback] = useState('');
+  const [detailsBusy, setDetailsBusy] = useState(false);
 
   // Google Login for Drive access
   const login = useGoogleLogin({
@@ -69,23 +44,16 @@ const EmployeeManagement = ({
     scope: 'https://www.googleapis.com/auth/drive.file',
   });
 
-  // Get all employees
-  const allEmployees = employees.length > 0 ? employees : Object.values(employeeMasterData);
-  const canTerminateEmployee = (employee) => {
-    if (!employee) return false;
-    if (userRole === 'CEO') return true;
-    if (userRole === 'COO') return employee.role !== 'CEO';
-    return false;
-  };
-  
+  const allEmployees = employees;
+
   // Get unique departments
   const departments = DEPARTMENTS;
   
   // Calculate stats dynamically
-  const activeCount = allEmployees.filter(e => e.status === 'Active' || e.isActive !== false).length;
+  const activeCount = allEmployees.filter(e => e.isActive !== false).length;
   const onLeaveCount = allEmployees.filter(e => e.status === 'On Leave' || e.employmentStatus === 'On Leave').length;
-  const ndaSignedCount = allEmployees.filter(e => e.documents?.nda || e.ndaSigned !== false).length;
-  const onboardedCount = allEmployees.filter(e => e.status !== 'Pending' && e.employmentStatus !== 'Pending').length;
+  const ndaSignedCount = allEmployees.filter(e => e.ndaSigned || e.documents?.nda?.signed).length;
+  const onboardedCount = allEmployees.filter(e => e.isOnboarded).length;
 
   const stats = {
     total: allEmployees.length,
@@ -115,91 +83,61 @@ const EmployeeManagement = ({
     return matchesSearch && matchesDepartment && matchesStatus;
   });
 
-  const handleViewEmployee = (employee) => {
+  const handleViewEmployee = async employee => {
     setSelectedEmployee(employee);
     setShowEmployeeModal(true);
     setActiveTab('personal');
-  };
-
-  const handleAddEmployee = () => {
-    setShowAddEmployeeModal(true);
-  };
-
-  const handleSaveNewEmployee = async () => {
+    setDetailError('');
+    setDetailsBusy(true);
     try {
-      const result = await addEmployee(newEmployee);
-      if (onAddEmployee) {
-        await onAddEmployee(result);
-      }
-      setShowAddEmployeeModal(false);
-      setNewEmployee({
-        name: '',
-        email: '',
-        phone: '',
-        department: '',
-        designation: '',
-        role: 'Member',
-        dateOfBirth: '',
-        gender: '',
-        bloodGroup: '',
-        nationality: 'Indian',
-        address: { street: '', city: '', state: '', zipCode: '', country: 'India' },
-        emergencyContact: { name: '', relation: '', phone: '' },
-        education: { college: '', degree: '', specialization: '', graduationYear: '', cgpa: '' },
-        skills: [],
-        joinDate: businessDate(),
-        workLocation: 'Remote',
-        bankDetails: { accountNumber: '', ifscCode: '', bankName: '', accountHolderName: '' }
-      });
-      alert('Employee added successfully!');
+      setSelectedEmployee(await employeeService.getEmployeeById(employee.id));
     } catch (error) {
-      console.error('Error adding employee:', error);
-      alert('Failed to add employee');
+      setDetailError(error.message);
+    } finally {
+      setDetailsBusy(false);
     }
   };
 
-  const handleUpdateEmployeeField = (field, value) => {
-    setSelectedEmployee({ ...selectedEmployee, [field]: value });
-  };
-
-  const handleSaveEmployeeChanges = async () => {
+  const handleResetPassword = async employee => {
+    setFeedback('');
+    const action = employee.setupEmailStatus ? 'setup-email' : 'reset-password';
     try {
-      if (onUpdateEmployee) {
-        await onUpdateEmployee(selectedEmployee);
-      }
-      setShowEmployeeModal(false);
-      alert('Employee updated successfully!');
+      await employeeService.accountAction(employee.id, action);
+      setFeedback(action === 'setup-email' ? 'Password setup email queued.' : 'Password reset email sent.');
     } catch (error) {
-      console.error('Error updating employee:', error);
-      alert('Failed to update employee');
+      setFeedback(error.message);
     }
   };
 
-  const handleResetPassword = async (employee) => {
-    if (window.confirm(`Reset password for ${employee.name}? A new temporary password will be generated.`)) {
-      try {
-        const { data } = await resetEmployeePassword(authService.getToken(), employee.id);
-        const newPassword = data.newPassword;
-        alert(`Password reset for ${employee.name}.\nNew temporary password: ${newPassword}\nUser will be prompted to change on next login.`);
-      } catch (error) {
-        console.error('Error resetting password:', error);
-        alert('Failed to reset password');
-      }
+  const handleTwoFactorReset = async employee => {
+    if (!window.confirm(`Reset two-factor authentication for ${employee.name}? They will be signed out.`)) return;
+    try {
+      await employeeService.apiRequest(`/auth/two-factor/${encodeURIComponent(employee.id)}/reset`, { method: 'POST' });
+      setFeedback('Two-factor authentication reset.');
+    } catch (error) {
+      setFeedback(error.message);
     }
   };
 
-  const handleTerminate = async (employee) => {
-    if (window.confirm(`Are you sure you want to terminate ${employee.name}? This will permanently remove them from the database.`)) {
-      try {
-        await employeeService.deleteEmployee(employee.id || employee._id);
-        if (onDeleteEmployee) {
-          await onDeleteEmployee(employee.id || employee._id);
-        }
-        alert(`${employee.name} has been terminated.`);
-      } catch (error) {
-        console.error('Error terminating employee:', error);
-        alert('Failed to terminate employee');
-      }
+  const handleAccountStatus = async employee => {
+    const active = !employee.isActive;
+    if (!active && !window.confirm(`Deactivate ${employee.name}?`)) return;
+    try {
+      await employeeService.accountAction(employee.id, active ? 'activate' : 'deactivate');
+      await onImportComplete?.();
+      setFeedback(active ? 'Employee activated.' : 'Employee deactivated.');
+    } catch (error) {
+      setFeedback(error.message);
+    }
+  };
+
+  const handleTerminate = async employee => {
+    if (!window.confirm(`Terminate ${employee.name}? Their employment history will be retained.`)) return;
+    try {
+      await onDeleteEmployee(employee.id);
+      setFeedback(`${employee.name} has been terminated.`);
+    } catch (error) {
+      setFeedback(error.message);
     }
   };
 
@@ -212,7 +150,7 @@ const EmployeeManagement = ({
     }
 
     if (file.size > 10 * 1024 * 1024) {
-      alert('File size must be less than 10MB');
+      setDetailError('File size must be 10 MB or less.');
       return;
     }
 
@@ -237,7 +175,7 @@ const EmployeeManagement = ({
       clearInterval(interval);
     } catch (error) {
       console.error('Upload error:', error);
-      alert('Upload failed. Please try again.');
+      setDetailError(error.message || 'Upload failed. Please try again.');
       setUploadProgress(null);
       clearInterval(interval);
     }
@@ -246,7 +184,8 @@ const EmployeeManagement = ({
   const getStatusBadge = (status) => {
     const badges = {
       active: 'bg-green-100 text-green-700',
-      on_leave: 'bg-yellow-100 text-yellow-700',
+      'on-leave': 'bg-yellow-100 text-yellow-700',
+      inactive: 'bg-gray-100 text-gray-700',
       terminated: 'bg-red-100 text-red-700',
       suspended: 'bg-orange-100 text-orange-700'
     };
@@ -268,6 +207,7 @@ const EmployeeManagement = ({
 
   return (
     <div className="space-y-6">
+      {feedback && <p className="alert" role="status">{feedback}</p>}
       {/* Page Header */}
       <div>
         <h1 className="text-2xl font-bold text-gray-900">Employee Master Database</h1>
@@ -319,6 +259,7 @@ const EmployeeManagement = ({
                 type="text"
                 placeholder="Search by name, email or employee ID..."
                 value={searchTerm}
+                maxLength={100}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="input w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent"
               />
@@ -344,7 +285,8 @@ const EmployeeManagement = ({
           >
             <option value="all">All Status</option>
             <option value="active">Active</option>
-            <option value="on_leave">On Leave</option>
+            <option value="on-leave">On Leave</option>
+            <option value="inactive">Inactive</option>
             <option value="terminated">Terminated</option>
           </select>
           
@@ -360,7 +302,7 @@ const EmployeeManagement = ({
 
           {canAdd && (
             <button
-              onClick={handleAddEmployee}
+              onClick={() => setShowAddEmployeeModal(true)}
               className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition-colors flex items-center space-x-2"
             >
               <IconPlus className="w-5 h-5" />
@@ -409,7 +351,7 @@ const EmployeeManagement = ({
                   </td>
                   <td className="px-6 py-4">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(employee.employmentStatus)}`}>
-                      {employee.employmentStatus?.charAt(0).toUpperCase() + employee.employmentStatus?.slice(1) || 'Active'}
+                      {employee.status}
                     </span>
                   </td>
                   <td className="px-6 py-4 text-sm text-gray-600">{employee.joinDate || employee.createdAt}</td>
@@ -421,13 +363,21 @@ const EmployeeManagement = ({
                       >
                         View
                       </button>
-                      <button
+                      {employee.canResetPassword && employee.isActive && <button
                         onClick={() => handleResetPassword(employee)}
                         className="btn btn-sm btn-ghost px-2 py-1 text-xs text-orange-600 hover:bg-orange-50 rounded transition-colors"
                       >
-                        Reset Pwd
-                      </button>
-                      {canDelete && employee.employmentStatus !== 'terminated' && canTerminateEmployee(employee) && (
+                        {employee.setupEmailStatus ? 'Resend setup link' : 'Send reset link'}
+                      </button>}
+                      {employee.canTerminate && ['CEO', 'COO', 'HR'].includes(userRole) && (
+                        <button className="btn btn-sm btn-ghost" onClick={() => handleTwoFactorReset(employee)}>
+                          Reset two-factor authentication
+                        </button>
+                      )}
+                      {employee.canDeactivate && <button className="btn btn-sm btn-ghost" onClick={() => handleAccountStatus(employee)}>
+                        {employee.isActive ? 'Deactivate' : 'Activate'}
+                      </button>}
+                      {canDelete && employee.canTerminate && (
                         <button
                           onClick={() => handleTerminate(employee)}
                           className="btn btn-sm btn-ghost px-2 py-1 text-xs text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -455,6 +405,8 @@ const EmployeeManagement = ({
       {showEmployeeModal && selectedEmployee && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-2xl shadow-xl max-w-6xl w-full max-h-[90vh] overflow-y-auto">
+            {detailError && <p className="alert alert-error" role="alert">{detailError}</p>}
+            {detailsBusy && <p className="px-6 py-2" role="status">Loading employee details…</p>}
             {/* Modal Header */}
             <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4 z-10">
               <div className="flex justify-between items-start">
@@ -472,7 +424,7 @@ const EmployeeManagement = ({
                   )}
                   <div>
                     <h2 className="text-xl font-bold text-gray-900">{selectedEmployee.name}</h2>
-                    <p className="text-gray-500">{selectedEmployee.designation || selectedEmployee.role} · {selectedEmployee.department}</p>
+                    <p className="text-gray-500">{selectedEmployee.designation || roleLabel(selectedEmployee.role)} · {selectedEmployee.department}</p>
                     <p className="text-sm text-gray-400">ID: {selectedEmployee.employeeId || selectedEmployee.id}</p>
                   </div>
                 </div>
@@ -652,7 +604,7 @@ const EmployeeManagement = ({
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm text-gray-500">Designation</label>
-                          <p className="text-gray-900">{selectedEmployee.designation || selectedEmployee.role}</p>
+                          <p className="text-gray-900">{selectedEmployee.designation || roleLabel(selectedEmployee.role)}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Department</label>
@@ -660,7 +612,7 @@ const EmployeeManagement = ({
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Reporting Manager</label>
-                          <p className="text-gray-900">{selectedEmployee.reportingManager || 'CEO'}</p>
+                          <p className="text-gray-900">{selectedEmployee.manager || 'Unassigned'}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Join Date</label>
@@ -673,7 +625,7 @@ const EmployeeManagement = ({
                         <div>
                           <label className="text-sm text-gray-500">Employment Status</label>
                           <span className={`ml-2 px-2 py-1 text-xs font-medium rounded-full ${getStatusBadge(selectedEmployee.employmentStatus)}`}>
-                            {selectedEmployee.employmentStatus}
+                            {selectedEmployee.status}
                           </span>
                         </div>
                       </div>
@@ -693,20 +645,25 @@ const EmployeeManagement = ({
                       <div className="space-y-3">
                         <div>
                           <label className="text-sm text-gray-500">Employee ID</label>
-                          <p className="text-gray-900 font-mono">{selectedEmployee.credentials?.employeeId || selectedEmployee.employeeId || selectedEmployee.id}</p>
+                          <p className="text-gray-900 font-mono">{selectedEmployee.employeeId || '—'}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Last Login</label>
-                          <p className="text-gray-900">{selectedEmployee.credentials?.lastLogin || 'Never'}</p>
+                          <p className="text-gray-900">{selectedEmployee.lastLogin ? displayDateTime(selectedEmployee.lastLogin) : 'Never'}</p>
                         </div>
                         <div>
                           <label className="text-sm text-gray-500">Login Count</label>
                           <p className="text-gray-900">{selectedEmployee.credentials?.loginCount || 0}</p>
                         </div>
                         <div>
-                          <label className="text-sm text-gray-500">Temporary Password</label>
-                          <p className="text-gray-900">{selectedEmployee.credentials?.tempPassword ? 'Yes' : 'No'}</p>
+                          <label className="text-sm text-gray-500">Password Setup</label>
+                          <p className="text-gray-900">{selectedEmployee.setupEmailStatus || 'Completed'}</p>
                         </div>
+                    {selectedEmployee.leaveBalance && <dl className="mt-3 grid gap-2 sm:grid-cols-3">
+                      {Object.entries(selectedEmployee.leaveBalance).map(([type, days]) => <div key={type}>
+                        <dt className="text-sm text-gray-500">{type} leave</dt><dd>{days} days</dd>
+                      </div>)}
+                    </dl>}
                       </div>
                     </div>
                   </div>
@@ -917,12 +874,13 @@ const EmployeeManagement = ({
               >
                 Close
               </button>
-              {canEdit && (
+              {canEdit && selectedEmployee.canTerminate && (
                 <button
-                  onClick={handleSaveEmployeeChanges}
+                  disabled={detailsBusy}
+                  onClick={() => setEditingEmployee(selectedEmployee)}
                   className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
                 >
-                  Save Changes
+                  Edit employee
                 </button>
               )}
             </div>
@@ -937,97 +895,19 @@ const EmployeeManagement = ({
         />
       )}
 
+      {editingEmployee && <EmployeeForm employee={editingEmployee} userRole={userRole} onClose={() => setEditingEmployee(null)}
+        onSave={async fields => {
+          const updated = await onUpdateEmployee({ ...fields, id: editingEmployee.id });
+          setSelectedEmployee({ ...selectedEmployee, ...updated });
+          setFeedback('Employee updated.');
+        }} />}
+
       {/* Add Employee Modal */}
-      {showAddEmployeeModal && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-          <div className="bg-white rounded-2xl shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="sticky top-0 bg-white border-b border-gray-200 px-6 py-4">
-              <div className="flex justify-between items-center">
-                <h2 className="text-xl font-bold text-gray-900">Add New Employee</h2>
-                <button onClick={() => setShowAddEmployeeModal(false)} className="text-gray-400 hover:text-gray-600">×</button>
-              </div>
-            </div>
-            
-            <div className="p-6 space-y-6">
-              <div className="grid grid-cols-2 gap-6">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name *</label>
-                  <input
-                    type="text"
-                    value={newEmployee.name}
-                    onChange={(e) => setNewEmployee({...newEmployee, name: e.target.value})}
-                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Email *</label>
-                  <input
-                    type="email"
-                    value={newEmployee.email}
-                    onChange={(e) => setNewEmployee({...newEmployee, email: e.target.value})}
-                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
-                  <input
-                    type="tel"
-                    value={newEmployee.phone}
-                    onChange={(e) => setNewEmployee({...newEmployee, phone: e.target.value})}
-                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Department *</label>
-                  <select
-                    value={newEmployee.department}
-                    onChange={(e) => setNewEmployee({...newEmployee, department: e.target.value})}
-                    className="select w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  >
-                    <option value="">Select Department</option>
-                    {DEPARTMENTS.map(dept => (
-                      <option key={dept} value={dept}>{dept}</option>
-                    ))}
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Designation/Role</label>
-                  <input
-                    type="text"
-                    value={newEmployee.designation}
-                    onChange={(e) => setNewEmployee({...newEmployee, designation: e.target.value})}
-                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Date of Birth</label>
-                  <input
-                    type="date"
-                    value={newEmployee.dateOfBirth}
-                    onChange={(e) => setNewEmployee({...newEmployee, dateOfBirth: e.target.value})}
-                    className="input w-full px-3 py-2 border rounded-lg focus:ring-2 focus:ring-purple-500"
-                  />
-                </div>
-              </div>
-            </div>
-            
-            <div className="sticky bottom-0 bg-gray-50 border-t border-gray-200 px-6 py-4 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowAddEmployeeModal(false)}
-                className="btn btn-sm btn-ghost px-4 py-2 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleSaveNewEmployee}
-                className="btn btn-sm btn-ghost px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700"
-              >
-                Add Employee
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      {showAddEmployeeModal && <EmployeeForm userRole={userRole} onClose={() => setShowAddEmployeeModal(false)}
+        onSave={async fields => {
+          await onAddEmployee(fields);
+          setFeedback('Employee added. Password setup email queued.');
+        }} />}
 
       {/* Document Upload Modal */}
       {showDocumentUpload && selectedEmployee && (

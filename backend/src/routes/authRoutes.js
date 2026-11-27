@@ -1,7 +1,10 @@
 const express = require('express');
 const { rateLimit } = require('express-rate-limit');
 const { protect, authorize } = require('../middleware/authMiddleware');
-const { register, login, logout, getMe, requestPasswordReset, validatePasswordReset, resetPassword, changePassword, updatePreferences } = require('../controllers/authController');
+const {
+  register, login, confirmTwoFactor, resetEmployeeTwoFactor, logout, getMe,
+  requestPasswordReset, validatePasswordReset, resetPassword, changePassword, updatePreferences
+} = require('../controllers/authController');
 
 const signup = require('../controllers/signupController');
 const router = express.Router();
@@ -19,8 +22,10 @@ router.use((req, res, next) => {
   next();
 });
 
-router.post('/register', protect, authorize('CEO', 'COO', 'Manager'), register);
+router.post('/register', protect, authorize('CEO', 'COO', 'Manager', 'HR'), register);
 router.post('/login', authRateLimit(50, true), login);
+router.post('/two-factor/verify', authRateLimit(50, true), confirmTwoFactor);
+router.post('/two-factor/:id/reset', protect, authorize('CEO', 'COO', 'HR'), resetEmployeeTwoFactor);
 router.post('/logout', protect, logout);
 router.get('/me', protect, getMe);
 router.get('/verify', protect, getMe);

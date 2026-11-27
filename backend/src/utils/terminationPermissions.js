@@ -10,7 +10,7 @@ const ROLE_HIERARCHY = {
 };
 
 function effectiveRole(user) {
-  const role = { Lead: 'Team Lead', 'Co-Lead': 'CO Head', Coordinator: 'HR' }[user.role] || user.role;
+  const role = { Lead: 'Team Lead', 'Co-Lead': 'CO Head', 'Co-Head': 'CO Head', Coordinator: 'HR' }[user.role] || user.role;
   return role === 'Team Lead' && /\bco[\s-]*(?:lead|head)\b/i.test(user.designation || '')
     ? 'CO Head' : role;
 }
@@ -22,9 +22,7 @@ function canTerminateUser(actor, target) {
   const targetRole = effectiveRole(target);
   if (['CEO', 'COO'].includes(targetRole)) return false;
   if (role === 'COO') return true;
-  if (['HR', 'Coordinator'].includes(role)) return targetRole !== 'HR';
-  return role === 'Team Lead' && ['Member', 'CO Head', 'Co-Head'].includes(targetRole) &&
-    Boolean(actor.department && actor.department === target.department);
+  return ['Manager', 'HR'].includes(role);
 }
 
 const getTerminationReason = (actorRole, targetRole) => canTerminateUser({ role: actorRole }, { role: targetRole })
@@ -32,9 +30,16 @@ const getTerminationReason = (actorRole, targetRole) => canTerminateUser({ role:
 
 function canAssignEmployeeRole(actorRole, targetRole) {
   if (!Object.hasOwn(ROLE_HIERARCHY, targetRole)) return false;
-  if (actorRole === 'CEO') return true;
-  if (actorRole === 'COO') return !['CEO', 'COO'].includes(targetRole);
-  return ['Manager', 'HR', 'Coordinator'].includes(actorRole) && targetRole === 'Member';
+  const actor = effectiveRole({ role: actorRole });
+  const target = effectiveRole({ role: targetRole });
+  if (actor === 'CEO') return true;
+  return ['COO', 'Manager', 'HR'].includes(actor) && !['CEO', 'COO'].includes(target);
 }
 
-module.exports = { ROLE_HIERARCHY, canTerminateUser, canAssignEmployeeRole, effectiveRole, getTerminationReason };
+function canChangeEmployeeRole(actor, target, nextRole) {
+  if (effectiveRole(actor) === 'CEO') return canAssignEmployeeRole(actor.role, nextRole);
+  return ['COO', 'Manager'].includes(effectiveRole(actor)) &&
+    canTerminateUser(actor, target) && canAssignEmployeeRole(actor.role, nextRole);
+}
+
+module.exports = { ROLE_HIERARCHY, canTerminateUser, canAssignEmployeeRole, canChangeEmployeeRole, effectiveRole, getTerminationReason };

@@ -21,6 +21,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
   const [selectedTask, setSelectedTask] = useState('');
   const [progress, setProgress] = useState(0);
   const [notes, setNotes] = useState('');
+  const [hoursWorked, setHoursWorked] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
   const [stats, setStats] = useState({
@@ -187,6 +188,11 @@ const TaskManagement = ({ userRole = 'Member' }) => {
 
     const task = myTasks.find(t => String(getTaskId(t)) === String(selectedTask));
     const taskId = getTaskId(task);
+    const hoursSpent = Number(hoursWorked);
+    if (!Number.isFinite(hoursSpent) || hoursSpent <= 0 || hoursSpent > 16) {
+      alert('Enter hours worked greater than 0 and at most 16.');
+      return;
+    }
 
     const logData = {
       taskId,
@@ -195,7 +201,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
       notes,
       content: notes,
       date: new Date().toISOString(),
-      hoursSpent: 0,
+      hoursSpent,
     };
 
     try {
@@ -203,6 +209,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
       setDailyLogs([newLog, ...dailyLogs]);
       await updateTaskProgress(taskId, progress);
       setNotes('');
+      setHoursWorked('');
       alert('Daily log submitted successfully!');
     } catch (err) {
       console.error('Error submitting daily log:', err);
@@ -214,7 +221,7 @@ const TaskManagement = ({ userRole = 'Member' }) => {
         await updateTaskProgress(taskId, progress);
         setNotes('');
       } else {
-        alert('Failed to submit daily log. Please try again.');
+        alert(err.message || 'Failed to submit daily log. Please try again.');
       }
     }
   };
@@ -437,6 +444,12 @@ const TaskManagement = ({ userRole = 'Member' }) => {
                   <span className="text-sm font-medium min-w-[45px]">{progress}%</span>
                 </div>
               </div>
+
+              <label className="grid gap-1 text-sm font-medium">
+                Hours worked
+                <input className="input w-full" type="number" min="0" max="16" step="any"
+                  value={hoursWorked} onChange={event => setHoursWorked(event.target.value)} required />
+              </label>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">NOTES / BLOCKERS</label>

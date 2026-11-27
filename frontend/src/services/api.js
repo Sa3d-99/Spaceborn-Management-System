@@ -5,7 +5,6 @@ import { normalizeDepartments } from '../utils/departments';
 class ApiService {
   constructor() {
     this.API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-    this.USE_MOCK = process.env.REACT_APP_USE_MOCK_AUTH === 'true';
   }
 
   // Generic request method
@@ -48,11 +47,6 @@ class ApiService {
       return { success: true, data };
     } catch (error) {
       console.error(`API Error (${endpoint}):`, error);
-      
-      // If mock mode is enabled, return mock data
-      if (this.USE_MOCK) {
-        return this.getMockData(endpoint);
-      }
       
       return { success: false, error: error.message };
     }
@@ -380,55 +374,6 @@ class ApiService {
     });
   }
 
-  // ==================== MOCK DATA FOR DEVELOPMENT ====================
-  
-  getMockData(endpoint) {
-    const mockData = {
-      '/auth/login': {
-        token: 'mock-jwt-token',
-        user: {
-          id: 'EMP001',
-          name: 'John Doe',
-          role: 'CEO',
-          department: 'Platform and DevOps',
-          email: ''
-        }
-      },
-      '/employees': [
-        { id: 1, name: 'John Doe', role: 'CEO', department: 'Platform and DevOps', email: '', employeeId: 'CEO001' },
-        { id: 2, name: 'Jane Smith', role: 'Manager', department: 'Platform and DevOps', email: 'jane.smith@spaceborn.com', employeeId: 'MGR001' },
-        { id: 3, name: 'Mike Johnson', role: 'Team Lead', department: 'Core Systems', email: 'mike.johnson@spaceborn.com', employeeId: 'LD001' },
-        { id: 4, name: 'Ravi Das', role: 'Member', department: 'Core Systems', email: 'ravi.das@spaceborn.com', employeeId: 'EMP001' }
-      ],
-      '/meetings': [
-        { id: 1, title: 'Q2 Sprint Planning', department: 'Core Systems', date: '2026-06-10', time: '10:00 AM' },
-        { id: 2, title: 'Hardware & Integration Review', department: 'Hardware & Integration', date: '2026-06-11', time: '2:00 PM' }
-      ],
-      '/notifications': [
-        { id: 1, title: 'Task assigned to you', read: false, category: 'Task' },
-        { id: 2, title: 'Meeting scheduled', read: true, category: 'Meeting' }
-      ],
-      '/tasks': [
-        { id: 1, title: 'Complete login page', status: 'In progress', progress: 75 },
-        { id: 2, title: 'API Integration', status: 'Pending', progress: 0 }
-      ],
-      '/dashboard/stats': {
-        totalEmployees: 45,
-        activeProjects: 12,
-        completedTasks: 156,
-        pendingTasks: 23
-      }
-    };
-
-    // Find matching mock data
-    for (const [key, value] of Object.entries(mockData)) {
-      if (endpoint.startsWith(key)) {
-        return { success: true, data: value };
-      }
-    }
-
-    return { success: true, data: [] };
-  }
 }
 
 export default new ApiService();

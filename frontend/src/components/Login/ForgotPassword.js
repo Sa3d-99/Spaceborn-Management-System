@@ -12,7 +12,7 @@ export default function ForgotPassword({ initialEmployeeId = '', onBackToLogin }
     event.preventDefault();
     const identifier = employeeId.trim();
     if (!identifier) {
-      setError('Enter your employee ID or email address.');
+      setError('Employee ID is required');
       return;
     }
     setLoading(true);
@@ -29,12 +29,12 @@ export default function ForgotPassword({ initialEmployeeId = '', onBackToLogin }
 
   return (
     <PasswordRecoveryLayout title="Forgot password">
-      {message && <p className="alert alert-success" role="status">{message}</p>}
+      {message && <p className="alert alert-info" role="status">{message}</p>}
       {error && <p className="alert alert-error" role="alert">{error}</p>}
       {!message && (
         <>
-          <p className="text-sm text-base-content/70">Enter your employee ID or email. We’ll send a secure link to your registered email address.</p>
-          <form className="grid gap-4" onSubmit={submit}>
+          <p className="text-sm text-base-content/70">Enter the employee ID or email on your CRM account.</p>
+          <form className="grid gap-4" onSubmit={submit} noValidate>
             <label className="grid gap-1">
               <span className="label">Employee ID or email</span>
               <input className="input w-full" autoComplete="username" autoCapitalize="none" spellCheck={false}

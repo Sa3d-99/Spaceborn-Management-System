@@ -1,9 +1,7 @@
 import { Edit } from '../../Common/Icons';
-import { AlertCircle as IconAlertCircle, Camera as IconCamera, Check as IconCheck, Info as IconInfo } from '../../Common/Icons';
-import { displayDateTime } from '../../../utils/timeZone';
+import { AlertCircle as IconAlertCircle, Camera as IconCamera, Check as IconCheck } from '../../Common/Icons';
 // src/components/Dashboard/Member/MemberProfileView.jsx
 import React, { useState } from 'react';
-import authService from '../../../services/authService';
 import { roleLabel } from '../../../utils/roleLabels';
 
 const MemberProfileView = ({ userData, onUpdate }) => {
@@ -45,45 +43,6 @@ const MemberProfileView = ({ userData, onUpdate }) => {
     }
   };
 
-  const sendNotificationToManager = async () => {
-    try {
-      const currentUser = authService.getCurrentUser();
-      const changeList = Object.entries(changes).map(([field, data]) => {
-        const fieldNames = {
-          name: 'Full Name',
-          email: 'Email Address',
-          phone: 'Phone Number',
-          profilePhoto: 'Profile Photo'
-        };
-        return `• ${fieldNames[field]}: "${data.old}" → "${data.new}"`;
-      }).join('\n');
-
-      const notificationData = {
-        employeeName: formData.name,
-        employeeId: formData.employeeId,
-        department: formData.department,
-        role: formData.role,
-        changes: changes,
-        changeList: changeList,
-        timestamp: displayDateTime(new Date())
-      };
-
-      // Store in localStorage for manager to see
-      const existingNotifications = JSON.parse(localStorage.getItem('managerNotifications') || '[]');
-      existingNotifications.unshift({
-        id: Date.now(),
-        type: 'profile_update',
-        ...notificationData,
-        read: false
-      });
-      localStorage.setItem('managerNotifications', JSON.stringify(existingNotifications));
-      
-      console.log('Notification sent to manager:', notificationData);
-    } catch (error) {
-      console.error('Error sending notification:', error);
-    }
-  };
-
   const handleSave = async () => {
     if (formData.phone && !/^[+]?[\d\s-]{10,15}$/.test(formData.phone)) {
       setError('Please enter a valid phone number');
@@ -105,10 +64,6 @@ const MemberProfileView = ({ userData, onUpdate }) => {
       };
 
       await onUpdate(updateData);
-      
-      if (Object.keys(changes).length > 0) {
-        await sendNotificationToManager();
-      }
       
       setIsEditing(false);
       setSaved(true);
@@ -139,7 +94,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
           {saved && (
             <div className="mb-4 p-3 bg-green-50 text-green-700 rounded-lg flex items-center space-x-2 border border-green-200">
               <IconCheck className="w-5 h-5" />
-              <span>Profile updated successfully! Your manager has been notified.</span>
+              <span>Profile updated.</span>
             </div>
           )}
 
@@ -254,7 +209,7 @@ const MemberProfileView = ({ userData, onUpdate }) => {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Manager</label>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Reporting manager</label>
               <p className="text-gray-900">{formData?.manager || 'N/A'}</p>
             </div>
           </div>
@@ -287,14 +242,6 @@ const MemberProfileView = ({ userData, onUpdate }) => {
             ) : null}
           </div>
 
-          {isEditing && (
-            <div className="mt-4 p-3 bg-blue-50 rounded-lg">
-              <p className="text-xs text-blue-700 flex items-center space-x-2">
-                <IconInfo className="w-4 h-4" />
-                <span>Your manager will be notified of any changes made to your profile.</span>
-              </p>
-            </div>
-          )}
         </div>
       </div>
     </div>

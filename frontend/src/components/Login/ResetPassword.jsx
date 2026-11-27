@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { setNewPassword, validateResetLink } from '../../services/passwordRecoveryService';
 import PasswordRecoveryLayout from './PasswordRecoveryLayout';
 
-const invalidLink = 'This link is invalid, expired, or already used. Request a new link.';
+const invalidLink = 'This reset link is invalid or has expired';
 
 function getResetToken() {
   return new URLSearchParams(window.location.hash.slice(1)).get('token');
@@ -55,8 +55,8 @@ export default function ResetPassword({ onBackToLogin, onRequestNewLink, onSetup
       return;
     }
     const length = [...password.normalize('NFC')].length;
-    if (length < 15 || length > 128) {
-      setError('Use 15 to 128 characters.');
+    if (length < 8 || length > 64) {
+      setError('Use 8 to 64 characters.');
       return;
     }
     setLoading(true);
@@ -103,7 +103,7 @@ export default function ResetPassword({ onBackToLogin, onRequestNewLink, onSetup
             <input className="input w-full" type="password" autoComplete="new-password"
               aria-describedby="password-guidance" value={password} onChange={event => setPassword(event.target.value)} required />
           </label>
-          <p id="password-guidance" className="text-sm text-base-content/70">Use 15 to 128 characters. A passphrase works well.</p>
+          <p id="password-guidance" className="text-sm text-base-content/70">Use 8 to 64 characters. A passphrase works well.</p>
           <label className="grid gap-1">
             <span className="label">Confirm new password</span>
             <input className="input w-full" type="password" autoComplete="new-password"

@@ -1,102 +1,28 @@
 import { Folder as IconFolder } from '../../Common/Icons';
-import React, { useEffect, useState } from 'react';
-import authService from '../../../services/authService';
+import React, { useState } from 'react';
+import useDashboardData from '../useDashboardData';
 import GoogleDriveViewer from '../../Common/GoogleDriveViewer';
 import { roleLabel } from '../../../utils/roleLabels';
 
 const CEODashboard = ({ user, onLogout }) => {
   const [showDriveViewer, setShowDriveViewer] = useState(false);
   
-  const [stats, setStats] = useState({
-    totalMembers: 12,
-    departments: 5,
-    sprintVelocity: 78,
-    activeProjects: 24,
-    tasksThisWeek: 78,
-    overdueTasks: 1,
-    resourceUtilization: 86,
-    resourceConflicts: 3,
-    pendingApprovals: 2
-  });
+  const { data: dashboardData, error, reload } = useDashboardData('/dashboard/ceo', 'Could not load the dashboard.');
+  if (error) return <div className="alert alert-error" role="alert">{error}
+    <button className="btn btn-sm" onClick={reload}>Try again</button>
+  </div>;
+  if (!dashboardData) return <p role="status">Loading dashboard…</p>;
 
-  // Mock data for display
-  const atRiskProjects = [{ name: 'Project Beta — Hardware & Integration', completion: 45 }];
-  const delayedProjects = [{ name: 'Project Delta — Ops', completion: 30 }];
-  const departmentProgress = [
-    { name: 'Core Systems', members: 48, progress: 82 },
-    { name: 'Hardware & Integration', members: 12, progress: 65 }
-  ];
-  const topPerformers = [
-    { name: 'Sita Krishnan', role: 'AI/LLM & Perception', tasks: 31, initials: 'SK' },
-    { name: 'Priya Sharma', role: 'Core Systems', tasks: 28, initials: 'PS' },
-    { name: 'Anil Mehta', role: 'Hardware & Integration', tasks: 22, initials: 'AM' }
-  ];
-  const upcomingMeetings = [
-    { date: '2026-06-05', title: 'Q2 Sprint Planning', dept: 'Core Systems', time: '10:00 AM' },
-    { date: '2026-06-06', title: 'Hardware & Integration System Review', dept: 'Hardware & Integration', time: '2:00 PM' },
-    { date: '2026-06-10', title: 'All-Hands Q2', dept: 'All', time: '9:00 AM' }
-  ];
-  const resourceRequests = [
-    { date: '2026-06-02', item: 'MacBook Pro M3', requester: 'Ravi Das', status: 'pending' },
-    { date: '2026-06-01', item: 'AWS Dev Credits', requester: 'Nisha Kumar', status: 'pending' },
-    { date: '2026-06-01', item: 'Figma Pro License', requester: 'Pooja B', status: 'approved' }
-  ];
-  const actionItems = [
-    { title: 'Review Beta project risk plan', priority: 'High', due: 'Today' },
-    { title: 'Approve resource requests (2)', priority: 'High', due: 'Today' },
-    { title: 'Sign off on Q2 sprint goals', priority: 'Medium', due: 'Jun 5' },
-    { title: 'Performance review — Ravi Das', priority: 'Medium', due: 'Jun 7' },
-    { title: 'Confirm all-hands agenda', priority: 'Low', due: 'Jun 9' }
-  ];
-  const recentActivity = [
-    { action: 'Priya Sharma completed Alpha milestone', time: '2h ago' },
-    { action: 'Beta project marked at risk', time: '6h ago' },
-    { action: 'New member joined Core Systems team', time: '4h ago' },
-    { action: 'Resource conflict resolved by Manager', time: '1d ago' },
-    { action: 'Hardware & Integration sprint review completed', time: '8h ago' },
-    { action: 'AI/LLM & Perception campaign exceeded targets', time: '1d ago' }
-  ];
-
-  const [dashboardData, setDashboardData] = useState(null);
-
-  useEffect(() => {
-    const fetchDashboardData = async () => {
-      const token = authService.getToken();
-
-      if (!token || process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        return;
-      }
-
-      try {
-        const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-        const response = await fetch(`${API_BASE_URL}/dashboard/ceo`, {
-          headers: { Authorization: `Bearer ${token}` }
-        });
-
-        if (!response.ok) {
-          throw new Error(`CEO dashboard request failed with ${response.status}`);
-        }
-
-        const data = await response.json();
-        setDashboardData(data);
-        setStats(prev => ({ ...prev, ...(data.stats || {}) }));
-      } catch (error) {
-        console.error('Error fetching CEO dashboard:', error);
-      }
-    };
-
-    fetchDashboardData();
-  }, []);
-
-  const liveAtRiskProjects = dashboardData?.atRiskProjects || atRiskProjects;
-  const liveDelayedProjects = dashboardData?.delayedProjects || delayedProjects;
-  const liveDepartmentProgress = dashboardData?.departmentProgress || departmentProgress;
-  const liveTopPerformers = dashboardData?.topPerformers || topPerformers;
-  const liveUpcomingMeetings = dashboardData?.upcomingMeetings || upcomingMeetings;
-  const liveResourceRequests = dashboardData?.resourceRequests || resourceRequests;
-  const liveActionItems = dashboardData?.actionItems || actionItems;
-  const liveRecentActivity = dashboardData?.recentActivity || recentActivity;
-  const teamHealth = dashboardData?.teamHealth || { active: 138, newThisMonth: 4, terminated: 2 };
+  const stats = dashboardData.stats || {};
+  const liveAtRiskProjects = dashboardData.atRiskProjects || [];
+  const liveDelayedProjects = dashboardData.delayedProjects || [];
+  const liveDepartmentProgress = dashboardData.departmentProgress || [];
+  const liveTopPerformers = dashboardData.topPerformers || [];
+  const liveUpcomingMeetings = dashboardData.upcomingMeetings || [];
+  const liveResourceRequests = dashboardData.resourceRequests || [];
+  const liveActionItems = dashboardData.actionItems || [];
+  const liveRecentActivity = dashboardData.recentActivity || [];
+  const teamHealth = dashboardData.teamHealth || {};
 
   const formatMeetingDate = (dateString) => {
     if (!dateString) return 'TBD';
@@ -127,14 +53,11 @@ const CEODashboard = ({ user, onLogout }) => {
 
       {/* CEO Profile Section */}
       <div className="bg-white rounded-xl border p-6 mb-6">
-        <h2 className="text-xl font-semibold text-gray-900">{user?.name || 'John Doe'}</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{user.name}</h2>
         <div className="flex items-center gap-2 mt-1">
           <span className="text-sm font-medium text-purple-700 bg-purple-100 px-2 py-0.5 rounded">CEO</span>
           <span className="text-sm text-gray-500">All Departments</span>
         </div>
-        <p className="text-gray-600 text-sm mt-3">
-          Driving company vision, culture, and growth across all departments. Focused on building a high-performance, people-first organization.
-        </p>
       </div>
 
       {/* Stats Row 1 */}

@@ -2,250 +2,48 @@ import { Clock as IconClock, Download as IconDownload, Search as IconSearch, X a
 import { displayDate, displayDateTime, displayTime } from '../../../utils/timeZone';
 // src/components/Dashboard/Manager/TeamReports.jsx
 import React, { useState, useEffect } from 'react';
-import reportService from '../../../services/reportService';
+import DailyReportReview from '../../Common/DailyReportReview';
 import roadmapService from '../../../services/roadmapService';
 import { roleLabel } from '../../../utils/roleLabels';
 
 const ManagerTeamReports = ({ userRole = 'Manager', department, user }) => {
   const isExecutiveViewer = userRole === 'COO';
-  const roadmapAudienceText = isExecutiveViewer ? 'COO View' : 'Manager View';
+  const roadmapAudienceText = isExecutiveViewer ? 'Director View' : 'Project Manager View';
   const issuedByText = isExecutiveViewer ? 'team leads' : 'your team lead';
-  const [reports, setReports] = useState([]);
   const [sharedRoadmaps, setSharedRoadmaps] = useState([]);
   const [activeTab, setActiveTab] = useState('daily');
   const [loading, setLoading] = useState(true);
-  const [dateFilter, setDateFilter] = useState('');
-  const [teamMembers, setTeamMembers] = useState([]);
-  const [selectedMember, setSelectedMember] = useState('all');
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedRoadmap, setSelectedRoadmap] = useState(null);
   const [showModal, setShowModal] = useState(false);
   const [toast, setToast] = useState(null);
-  const [stats, setStats] = useState({
-    totalReports: 0,
-    teamMembers: 0,
-    completionRate: 0,
-    activeRoadmaps: 0,
-    avgProgress: 0,
-    pendingReviews: 0
-  });
+  const reportDepartment = isExecutiveViewer ? undefined : (department || user?.department);
+  const [roadmapError, setRoadmapError] = useState('');
 
   useEffect(() => {
-    fetchAllData();
-  }, [department, userRole]);
+    if (activeTab !== 'mvp') return;
+    let current = true;
+    setLoading(true);
+    setRoadmapError('');
+    async function loadRoadmaps() {
+      const filters = { status: 'shared' };
+      if (reportDepartment) filters.department = reportDepartment;
+      try {
+        const roadmaps = await roadmapService.getAllRoadmaps(filters);
+        if (current) setSharedRoadmaps(roadmaps);
+      } catch (error) {
+        if (current) setRoadmapError(error.message || 'Could not load roadmaps.');
+      } finally {
+        if (current) setLoading(false);
+      }
+    }
+    loadRoadmaps();
+    return () => { current = false; };
+  }, [activeTab, reportDepartment]);
 
   const showToastMessage = (message, type = 'success') => {
     setToast({ message, type });
     setTimeout(() => setToast(null), 3000);
-  };
-
-  const fetchAllData = async () => {
-    setLoading(true);
-    try {
-      // Fetch reports for the department, or all reports for COO.
-      const reportsData = isExecutiveViewer
-        ? await reportService.getAllReports()
-        : await reportService.getReportsByDepartment(department);
-      setReports(reportsData);
-      
-      // Get team members
-      const members = [...new Set(reportsData.map(r => r.userName))];
-      setTeamMembers(members);
-      
-      // Fetch issued roadmaps for the department, or all issued roadmaps for COO.
-      const roadmapsData = await fetchSharedRoadmaps();
-      
-      // Calculate stats
-      calculateStats(reportsData, roadmapsData);
-      
-    } catch (error) {
-      console.error('Error fetching data:', error);
-      if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        loadMockData();
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const fetchSharedRoadmaps = async () => {
-    try {
-      const filters = { status: 'shared' };
-      if (!isExecutiveViewer && department) filters.department = department;
-      const data = await roadmapService.getAllRoadmaps(filters);
-
-      if (data.length > 0) {
-        setSharedRoadmaps(data);
-        return data;
-      }
-      return loadMockRoadmaps();
-    } catch (error) {
-      console.error('Error fetching roadmaps:', error);
-      return loadMockRoadmaps();
-    }
-  };
-
-  const loadMockData = () => {
-    const mockReports = [
-      {
-        id: 1,
-        userId: 'emp_001',
-        userName: 'Ravi Das',
-        userRole: 'Frontend Developer',
-        department: department || 'Core Systems',
-        employeeId: 'ENG001',
-        date: '2026-06-10',
-        completedTasks: '- Implemented login UI component\n- Fixed responsive layout issues\n- Updated authentication flow',
-        ongoingWork: 'Working on dashboard performance optimization',
-        issuesFaced: 'API rate limiting causing delays',
-        nextDayPlan: 'Complete integration with auth API',
-        submittedAt: '2026-06-10T16:30:00Z',
-        reviewed: false
-      },
-      {
-        id: 2,
-        userId: 'emp_002',
-        userName: 'Nisha Kumar',
-        userRole: 'Backend Developer',
-        department: department || 'Core Systems',
-        employeeId: 'ENG002',
-        date: '2026-06-10',
-        completedTasks: '- Database schema migration\n- API endpoint optimization\n- Cache layer implementation',
-        ongoingWork: 'Working on WebSocket integration',
-        issuesFaced: 'No major issues',
-        nextDayPlan: 'Complete real-time notifications',
-        submittedAt: '2026-06-10T17:00:00Z',
-        reviewed: false
-      },
-      {
-        id: 3,
-        userId: 'emp_003',
-        userName: 'Priya Sharma',
-        userRole: 'Core Systems Lead',
-        department: department || 'Core Systems',
-        employeeId: 'ENG003',
-        date: '2026-06-10',
-        completedTasks: '- Team sync meetings\n- Code review for 3 PRs\n- Sprint planning',
-        ongoingWork: 'Preparing Q3 roadmap',
-        issuesFaced: 'Resource allocation for new project',
-        nextDayPlan: 'Client demo preparation',
-        submittedAt: '2026-06-10T18:15:00Z',
-        reviewed: true
-      },
-      {
-        id: 4,
-        userId: 'emp_004',
-        userName: 'Pooja B',
-        userRole: 'UI Designer',
-        department: department || 'Hardware & Integration',
-        employeeId: 'DES001',
-        date: '2026-06-10',
-        completedTasks: '- Dashboard mockups\n- Hardware & Integration system updates\n- Icon set creation',
-        ongoingWork: 'Mobile app designs',
-        issuesFaced: 'Hardware & Integration tool compatibility',
-        nextDayPlan: 'Complete user flow diagrams',
-        submittedAt: '2026-06-10T16:45:00Z',
-        reviewed: false
-      }
-    ];
-    
-    const deptFiltered = isExecutiveViewer || !department
-      ? mockReports
-      : mockReports.filter(r => r.department === department);
-    setReports(deptFiltered);
-    
-    const members = [...new Set(deptFiltered.map(r => r.userName))];
-    setTeamMembers(members);
-  };
-
-  const loadMockRoadmaps = () => {
-    const mockRoadmaps = [
-      {
-        id: 1,
-        title: 'SpaceBorn CMS MVP Roadmap',
-        version: '2.1',
-        description: 'Complete roadmap for SpaceBorn CMS MVP development including core features, milestones, and delivery timeline.',
-        startDate: '2026-01-15',
-        targetDate: '2026-12-20',
-        lastUpdated: '2026-06-10T10:00:00Z',
-        status: 'active',
-        sharedBy: {
-          id: 'lead_001',
-          name: 'Priya Sharma',
-          role: 'Core Systems Lead',
-          email: 'priya.sharma@spaceborn.com',
-          avatar: 'PS'
-        },
-        sharedAt: '2026-06-10T10:00:00Z',
-        department: 'Core Systems',
-        overallProgress: 45,
-        milestones: [
-          { id: 1, title: 'Phase 1: Foundation', dueDate: '2026-03-15', status: 'completed', description: 'Basic setup and architecture', progress: 100 },
-          { id: 2, title: 'Phase 2: Core Features', dueDate: '2026-06-30', status: 'in-progress', description: 'Authentication, Dashboard, Content Management', progress: 65 },
-          { id: 3, title: 'Phase 3: Advanced Features', dueDate: '2026-09-30', status: 'planned', description: 'Analytics, AI Insights, Collaboration', progress: 20 },
-          { id: 4, title: 'Phase 4: Polish & Launch', dueDate: '2026-12-20', status: 'planned', description: 'Testing, Optimization, Deployment', progress: 0 }
-        ],
-        features: [
-          { id: 1, name: 'User Authentication', priority: 'high', status: 'completed', completionDate: '2026-03-15' },
-          { id: 2, name: 'Dashboard UI', priority: 'high', status: 'completed', completionDate: '2026-04-20' },
-          { id: 3, name: 'Content Management System', priority: 'high', status: 'in-progress', expectedCompletion: '2026-07-15' },
-          { id: 4, name: 'AI-Powered Insights', priority: 'medium', status: 'planned', expectedCompletion: '2026-09-30' }
-        ],
-        risks: [
-          { id: 1, description: 'Third-party API dependency', impact: 'high', mitigation: 'Have fallback and caching strategy', status: 'monitoring', owner: 'Nisha Kumar' },
-          { id: 2, description: 'Resource constraints', impact: 'medium', mitigation: 'Cross-training team members', status: 'mitigated', owner: 'Priya Sharma' }
-        ],
-        weeklyUpdates: [
-          { week: 23, date: '2026-06-07', progress: 45, completedFeatures: ['User Authentication'], nextWeekPlan: ['Complete Dashboard UI'], blockers: [], teamHealth: 85 }
-        ],
-        attachments: []
-      }
-    ];
-    
-    // Filter roadmaps by department
-    const deptFiltered = isExecutiveViewer || !department
-      ? mockRoadmaps
-      : mockRoadmaps.filter(r => r.department === department);
-    setSharedRoadmaps(deptFiltered);
-    calculateStats(reports, deptFiltered);
-    return deptFiltered;
-  };
-
-  const calculateStats = (reportsData, roadmapsData) => {
-    const totalReportsCount = reportsData.length;
-    const teamMembersCount = [...new Set(reportsData.map(r => r.userName))].length;
-    const completionRateValue = teamMembersCount > 0 ? ((totalReportsCount / (teamMembersCount * 30)) * 100).toFixed(1) : 0;
-    const activeRoadmapsCount = roadmapsData.filter(r => ['active', 'shared'].includes(r.status)).length;
-    const avgProgressValue = roadmapsData.reduce((sum, r) => sum + (r.overallProgress || 0), 0) / roadmapsData.length || 0;
-    
-    setStats({
-      totalReports: totalReportsCount,
-      teamMembers: teamMembersCount,
-      completionRate: completionRateValue,
-      activeRoadmaps: activeRoadmapsCount,
-      avgProgress: Math.round(avgProgressValue),
-      pendingReviews: reportsData.filter(r => !r.reviewed).length
-    });
-  };
-
-  const getFilteredReports = () => {
-    let filtered = [...reports];
-    
-    if (selectedMember !== 'all') {
-      filtered = filtered.filter(r => r.userName === selectedMember);
-    }
-    
-    if (dateFilter) {
-      filtered = filtered.filter(r => r.date === dateFilter);
-    }
-    
-    const grouped = filtered.reduce((acc, report) => {
-      if (!acc[report.date]) acc[report.date] = [];
-      acc[report.date].push(report);
-      return acc;
-    }, {});
-    
-    return grouped;
   };
 
   const getFilteredRoadmaps = () => {
@@ -362,11 +160,9 @@ Report Generated: ${displayDateTime(new Date())}
     );
   };
 
-  const filteredGroupedReports = getFilteredReports();
-  const sortedDates = Object.keys(filteredGroupedReports).sort((a, b) => new Date(b) - new Date(a));
   const filteredRoadmaps = getFilteredRoadmaps();
 
-  if (loading) {
+  if (activeTab === 'mvp' && loading) {
     return (
       <div className="flex justify-center items-center h-96">
         <div className="text-center">
@@ -390,81 +186,6 @@ Report Generated: ${displayDateTime(new Date())}
           </div>
         </div>
       )}
-
-      {/* Team Stats Dashboard */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4">
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Team Members</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.teamMembers}</p>
-            </div>
-            <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">👥</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Total Reports</p>
-              <p className="text-2xl font-bold text-gray-900">{stats.totalReports}</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">📊</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Report Rate</p>
-              <p className="text-2xl font-bold text-green-600">{stats.completionRate}%</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">✅</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Active Roadmaps</p>
-              <p className="text-2xl font-bold text-purple-600">{stats.activeRoadmaps}</p>
-            </div>
-            <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">🗺️</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Avg MVP Progress</p>
-              <p className="text-2xl font-bold text-green-600">{stats.avgProgress}%</p>
-            </div>
-            <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">🎯</span>
-            </div>
-          </div>
-        </div>
-        
-        <div className="bg-white rounded-xl p-4 border shadow-sm hover:shadow-md transition-shadow">
-          <div className="flex items-center justify-between">
-            <div>
-              <p className="text-sm text-gray-500">Pending Reviews</p>
-              <p className="text-2xl font-bold text-orange-600">{stats.pendingReviews}</p>
-            </div>
-            <div className="w-10 h-10 bg-orange-100 rounded-lg flex items-center justify-center">
-              <span className="text-xl">⏳</span>
-            </div>
-          </div>
-        </div>
-      </div>
 
       {/* Tab Navigation */}
       <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
@@ -494,9 +215,9 @@ Report Generated: ${displayDateTime(new Date())}
               <span className="flex items-center space-x-2">
                 <span>🚀</span>
                 <span>MVP Roadmaps</span>
-                {stats.activeRoadmaps > 0 && (
+                {sharedRoadmaps.length > 0 && (
                   <span className="ml-2 px-2 py-0.5 text-xs bg-purple-100 text-purple-700 rounded-full">
-                    {stats.activeRoadmaps}
+                    {sharedRoadmaps.length}
                   </span>
                 )}
               </span>
@@ -505,140 +226,8 @@ Report Generated: ${displayDateTime(new Date())}
         </div>
       </div>
 
-      {/* Daily Reports Tab */}
-      {activeTab === 'daily' && (
-        <div className="bg-white rounded-xl shadow-sm border overflow-hidden">
-          <div className="bg-gradient-to-r from-purple-600 to-pink-600 px-6 py-4">
-            <div className="flex justify-between items-center flex-wrap gap-4">
-              <div>
-                <h2 className="text-xl font-semibold text-white">📊 Team Daily Reports</h2>
-                <p className="text-purple-100 text-sm">Review your team's daily submissions • {department} Department</p>
-              </div>
-              <div className="flex gap-3">
-                <select
-                  value={selectedMember}
-                  onChange={(e) => setSelectedMember(e.target.value)}
-                  className="select px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
-                >
-                  <option value="all" className="text-black">All Members</option>
-                  {teamMembers.map(member => (
-                    <option key={member} value={member} className="text-black">{member}</option>
-                  ))}
-                </select>
-                <input
-                  type="date"
-                  value={dateFilter}
-                  onChange={(e) => setDateFilter(e.target.value)}
-                  className="input px-3 py-1 bg-white/10 text-white rounded-lg text-sm border border-white/20 focus:outline-none"
-                  placeholder="Filter by date"
-                />
-                {dateFilter && (
-                  <button
-                    onClick={() => setDateFilter('')}
-                    className="btn btn-sm btn-ghost px-3 py-1 bg-red-500/20 text-red-300 rounded-lg text-sm hover:bg-red-500/30"
-                  >
-                    Clear
-                  </button>
-                )}
-              </div>
-            </div>
-          </div>
-          
-          <div className="divide-y divide-gray-100">
-            {sortedDates.length === 0 ? (
-              <div className="p-12 text-center">
-                <div className="text-6xl mb-4">📭</div>
-                <p className="text-gray-500 text-lg">No daily reports found for your team</p>
-                <p className="text-sm text-gray-400 mt-1">Team members haven't submitted any reports yet</p>
-              </div>
-            ) : (
-              sortedDates.map((date) => (
-                <div key={date} className="p-6">
-                  <div className="flex items-center justify-between mb-4">
-                    <h3 className="font-semibold text-lg text-gray-900">
-                      {displayDate(date, 'en-US', {
-                        weekday: 'long', 
-                        year: 'numeric', 
-                        month: 'long', 
-                        day: 'numeric' 
-                      })}
-                    </h3>
-                    <span className="text-sm text-gray-500">
-                      {filteredGroupedReports[date]?.length || 0} report(s)
-                    </span>
-                  </div>
-                  <div className="space-y-4">
-                    {filteredGroupedReports[date]?.map((report) => (
-                      <div key={report.id} className="border rounded-xl p-5 bg-gray-50 hover:shadow-md transition-all duration-200">
-                        <div className="flex justify-between items-start mb-4">
-                          <div>
-                            <div className="flex items-center flex-wrap gap-2 mb-1">
-                              <span className="font-semibold text-gray-900 text-lg">{report.userName}</span>
-                              <span className="text-sm text-gray-500">({report.userRole})</span>
-                              <span className="px-2 py-0.5 text-xs bg-gray-200 text-gray-700 rounded-full">
-                                ID: {report.employeeId || 'N/A'}
-                              </span>
-                              {!report.reviewed && (
-                                <span className="px-2 py-0.5 text-xs bg-yellow-100 text-yellow-700 rounded-full">
-                                  Pending Review
-                                </span>
-                              )}
-                            </div>
-                          </div>
-                          <span className="text-xs text-gray-400">
-                            {displayTime(report.submittedAt)}
-                          </span>
-                        </div>
-                        
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                          <div className="space-y-3">
-                            <div className="flex items-start space-x-2">
-                              <span className="text-green-600 text-lg">✅</span>
-                              <div>
-                                <p className="font-medium text-gray-700">Completed Tasks</p>
-                                <p className="text-gray-600 text-sm mt-1 whitespace-pre-wrap">{report.completedTasks}</p>
-                              </div>
-                            </div>
-                            {report.ongoingWork && (
-                              <div className="flex items-start space-x-2">
-                                <span className="text-blue-600 text-lg">🔄</span>
-                                <div>
-                                  <p className="font-medium text-gray-700">Ongoing Work</p>
-                                  <p className="text-gray-600 text-sm mt-1">{report.ongoingWork}</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                          <div className="space-y-3">
-                            {report.issuesFaced && (
-                              <div className="flex items-start space-x-2">
-                                <span className="text-red-600 text-lg">⚠️</span>
-                                <div>
-                                  <p className="font-medium text-gray-700">Issues Faced</p>
-                                  <p className="text-gray-600 text-sm mt-1">{report.issuesFaced}</p>
-                                </div>
-                              </div>
-                            )}
-                            {report.nextDayPlan && (
-                              <div className="flex items-start space-x-2">
-                                <span className="text-purple-600 text-lg">📅</span>
-                                <div>
-                                  <p className="font-medium text-gray-700">Next Day Plan</p>
-                                  <p className="text-gray-600 text-sm mt-1">{report.nextDayPlan}</p>
-                                </div>
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </div>
-      )}
+      {activeTab === 'daily' && <DailyReportReview scopedDepartment={reportDepartment} />}
+      {activeTab === 'mvp' && roadmapError && <p className="alert alert-error" role="alert">{roadmapError}</p>}
 
       {/* MVP Roadmaps Tab */}
       {activeTab === 'mvp' && (

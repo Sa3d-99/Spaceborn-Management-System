@@ -7,8 +7,7 @@
 //   Options: --sheet "Sheet name"   pick a worksheet (default: first)
 //
 // Uses DATABASE_URL if set (Render/Supabase), otherwise the local PGlite database.
-// New employees get a random temporary password; these are written to
-// employee-credentials-<timestamp>.csv next to the input file. Share them privately, then delete the file.
+// New employees receive a one-time password setup link from the running CRM.
 require('../src/config/env');
 const path = require('path');
 const fs = require('fs');
@@ -26,60 +25,6 @@ function parseArgs(argv) {
   return args;
 }
 
-const cellValue = (v) => {
-  if (v === null || v === undefined) return '';
-  if (v instanceof Date) return v;
-  if (typeof v === 'object') {
-    if (v.text !== undefined) return v.text;
-    if (v.result !== undefined) return v.result;
-    if (Array.isArray(v.richText)) return v.richText.map((t) => t.text).join('');
-    if (v.hyperlink) return v.text || v.hyperlink.replace(/^mailto:/, '');
-  }
-  return v;
-};
-
-async function readRows(file, sheetName) {
-  const ExcelJS = require('exceljs');
-  const wb = new ExcelJS.Workbook();
-  const ext = path.extname(file).toLowerCase();
-  let ws;
-  if (ext === '.csv') ws = await wb.csv.readFile(file);
-  else if (ext === '.xlsx' || ext === '.xlsm') {
-    await wb.xlsx.readFile(file);
-    ws = sheetName ? wb.getWorksheet(sheetName) : wb.worksheets[0];
-    if (!ws) throw new Error(`Worksheet "${sheetName}" not found. Available: ${wb.worksheets.map((w) => w.name).join(', ')}`);
-  } else {
-    throw new Error('Unsupported file type. Save the sheet as .xlsx or .csv (old .xls is not supported).');
-  }
-
-  // Header row = first row with at least two non-empty cells (handles title rows above the table).
-  let headerRowNum = 1;
-  for (let r = 1; r <= Math.min(ws.rowCount, 10); r++) {
-    const vals = (ws.getRow(r).values || []).filter((v) => String(cellValue(v)).trim() !== '');
-    if (vals.length >= 2) { headerRowNum = r; break; }
-  }
-  const headerRow = ws.getRow(headerRowNum);
-  const headers = [];
-  headerRow.eachCell({ includeEmpty: true }, (cell, col) => { headers[col] = String(cellValue(cell.value)).trim(); });
-
-  const rows = [];
-  for (let r = headerRowNum + 1; r <= ws.rowCount; r++) {
-    const row = ws.getRow(r);
-    const obj = { __row__: r }; // real sheet row number for error messages
-    let any = false;
-    headers.forEach((h, col) => {
-      if (!h) return;
-      const v = cellValue(row.getCell(col).value);
-      if (String(v).trim() !== '') any = true;
-      obj[h] = v;
-    });
-    if (any) rows.push(obj);
-  }
-  return { rows, sheet: ws.name, headerRowNum };
-}
-
-const csvEscape = (v) => `"${String(v ?? '').replace(/"/g, '""')}"`;
-
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   if (args.help || !args.file) {
@@ -89,8 +34,13 @@ async function main() {
   const file = path.resolve(args.file);
   if (!fs.existsSync(file)) throw new Error(`File not found: ${file}`);
 
-  const { rows, sheet, headerRowNum } = await readRows(file, args.sheet);
-  console.log(`📄 ${path.basename(file)} — sheet "${sheet}", header on row ${headerRowNum}, ${rows.length} data rows`);
+  if (!/\.(xlsx|csv)$/i.test(file)) throw new Error('Choose an .xlsx or .csv file.');
+  if (fs.statSync(file).size > 5 * 1024 ** 2) throw new Error('File size must be 5 MB or less.');
+  const { readEmployeeWorkbook } = require('../src/services/employeeWorkbook');
+  const { rows, headerRow, file: { sheet } } = await readEmployeeWorkbook(fs.readFileSync(file), file, args.sheet);
+  if (!headerRow || !rows.length) throw new Error('No employee rows found. Include name and email headings.');
+  if (rows.length > 2000) throw new Error('Import is limited to 2,000 employee rows.');
+  console.log(`Worksheet ${sheet}, header row ${headerRow}, ${rows.length} employee rows.`);
 
   const connectDB = require('../src/config/db');
   await connectDB();
@@ -125,13 +75,8 @@ async function main() {
     result.managerWarnings.forEach((w) => console.log(`  ${w.employeeId}: "${w.manager}"`));
   }
 
-  if (!result.dryRun && result.credentials.length) {
-    const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const out = path.join(path.dirname(file), `employee-credentials-${stamp}.csv`);
-    const lines = ['Employee ID,Name,Email,Temporary Password',
-      ...result.credentials.map((c) => [c.employeeId, c.name, c.email, c.password].map(csvEscape).join(','))];
-    fs.writeFileSync(out, lines.join('\n'), { mode: 0o600 });
-    console.log(`\n🔑 Login credentials for ${result.credentials.length} new employees saved to:\n   ${out}\n   Share privately and delete this file afterwards.`);
+  if (!result.dryRun && result.created.length) {
+    console.log(`Password setup emails queued for ${result.created.length} employees.`);
   }
 
   if (result.dryRun) console.log('\nRe-run with --commit to write these changes.');

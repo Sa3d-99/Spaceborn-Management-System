@@ -23,13 +23,14 @@ afterEach(() => {
 });
 
 test('requesting a reset uses the entered identity and shows the generic email confirmation', async () => {
-  const message = 'If the account can be reset, a link will be sent to its registered email.';
+  const message = 'Request received. Only active, registered CRM accounts receive a reset link at their saved email address.';
   const fetch = vi.fn().mockResolvedValue(json({ success: true, message }, 202));
   vi.stubGlobal('fetch', fetch);
   render(<ForgotPassword initialEmployeeId=" employee@example.test " onBackToLogin={vi.fn()} />);
 
   fireEvent.click(screen.getByRole('button', { name: 'Send reset link' }));
   expect(await screen.findByRole('status')).toHaveTextContent(message);
+  expect(screen.getByRole('status')).toHaveClass('alert-info');
   expect(fetch.mock.calls[0][0]).toMatch(/\/auth\/forgot-password$/);
   expect(JSON.parse(fetch.mock.calls[0][1].body)).toEqual({ employeeId: 'employee@example.test' });
 });
@@ -39,12 +40,12 @@ test('missing and rejected reset links offer a new request without showing passw
   vi.stubGlobal('fetch', fetch);
 
   renderReset('');
-  expect(screen.getByRole('alert')).toHaveTextContent('invalid, expired, or already used');
+  expect(screen.getByRole('alert')).toHaveTextContent('invalid or has expired');
   expect(fetch).not.toHaveBeenCalled();
   cleanup();
 
   const { onRequestNewLink } = renderReset();
-  expect(await screen.findByRole('alert')).toHaveTextContent('invalid, expired, or already used');
+  expect(await screen.findByRole('alert')).toHaveTextContent('invalid or has expired');
   expect(screen.queryByLabelText('New password', { exact: true })).not.toBeInTheDocument();
   fireEvent.click(screen.getByRole('button', { name: 'Request a new link' }));
   expect(onRequestNewLink).toHaveBeenCalledOnce();

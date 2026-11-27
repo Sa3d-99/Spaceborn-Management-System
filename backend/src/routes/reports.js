@@ -1,6 +1,7 @@
 // routes/reports.js
 const express = require('express');
 const router = express.Router();
+const { protect } = require('../middleware/authMiddleware');
 const { 
   submitReport, 
   getTodayReport, 
@@ -12,8 +13,7 @@ const {
   getComplianceReport 
 } = require('../controllers/reportController');
 
-// Public routes for testing (remove protect later)
-// No auth middleware for testing
+router.use(protect);
 router.post('/', submitReport);
 router.get('/user/:userId/today', getTodayReport);
 router.get('/user/:userId', getUserReports);

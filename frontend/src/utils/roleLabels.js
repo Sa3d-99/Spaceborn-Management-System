@@ -10,6 +10,7 @@ export const ROLE_LABELS = {
   'CO Head': 'Co-Lead',
   'Co-Head': 'Co-Lead',
   HR: 'HR',
+  Coordinator: 'HR',
   Member: 'Intern'
 };
 

@@ -733,7 +733,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
             {/* Managers */}
             {hierarchy.managers.length > 0 && (
               <div>
-                <h3 className="text-center text-sm font-medium text-gray-500 mb-4">MANAGERS</h3>
+                <h3 className="text-center text-sm font-medium text-gray-500 mb-4">PROJECT MANAGERS</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {hierarchy.managers.map(manager => (
                     <div key={manager.id} className="text-center p-4 bg-blue-50 rounded-xl border border-blue-200">
@@ -741,7 +741,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                         {manager.initials}
                       </div>
                       <p className="font-medium text-gray-900">{manager.name}</p>
-                      <p className="text-sm text-blue-600">Manager</p>
+                      <p className="text-sm text-blue-600">Project Manager</p>
                       <p className="text-xs text-gray-500 mt-1">{manager.department}</p>
                     </div>
                   ))}
@@ -841,7 +841,7 @@ const TeamsAndRoles = ({ userRole = 'CEO' }) => {
                       <p className="text-gray-900 mt-1">{formatDate(selectedMember.joinDate)}</p>
                     </div>
                     <div>
-                      <label className="text-xs text-gray-500 uppercase font-medium">Manager</label>
+                      <label className="text-xs text-gray-500 uppercase font-medium">Reporting manager</label>
                       <p className="text-gray-900 mt-1">{selectedMember.manager || 'N/A'}</p>
                     </div>
                   </div>

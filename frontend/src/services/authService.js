@@ -10,127 +10,17 @@ class AuthService {
     this.TOKEN_REFRESH_THRESHOLD = parseInt(process.env.REACT_APP_TOKEN_REFRESH_THRESHOLD) || 60 * 60 * 1000; // 1 hour
     this.MAX_LOGIN_ATTEMPTS = parseInt(process.env.REACT_APP_MAX_LOGIN_ATTEMPTS) || 5;
     this.LOCKOUT_DURATION = parseInt(process.env.REACT_APP_LOCKOUT_DURATION) || 15 * 60 * 1000; // 15 minutes
-    this.USE_MOCK = process.env.REACT_APP_USE_MOCK_AUTH === 'true'; // Mock mode flag
     
     // Track login attempts
     this.loginAttempts = 0;
     this.lockoutUntil = null;
     
     
-    // Mock user database (Employee ID based)
-    this.mockUsers = {
-      'CEO001': { 
-        id: 1,
-        employeeId: 'CEO001',
-        password: 'admin123',
-        name: 'John Doe',
-        role: 'CEO',
-        department: 'Platform and DevOps',
-        email: '',
-        phone: '+1 555 000 0001',
-        joinDate: '2020-01-01',
-        status: 'Active',
-        manager: 'Board'
-      },
-      'MGR001': { 
-        id: 2,
-        employeeId: 'MGR001',
-        password: 'manager123',
-        name: 'Jane Smith',
-        role: 'Manager',
-        department: 'Platform and DevOps',
-        email: 'jane.smith@spaceborn.com',
-        phone: '+1 555 000 0002',
-        joinDate: '2021-03-15',
-        status: 'Active',
-        manager: 'John Doe'
-      },
-      'COO001': {
-        id: 8,
-        employeeId: 'COO001',
-        password: 'coo123',
-        name: 'Aarav Mehta',
-        role: 'COO',
-        department: 'Platform and DevOps',
-        email: 'aarav.mehta@spaceborn.com',
-        phone: '+1 555 000 0008',
-        joinDate: '2021-01-10',
-        status: 'Active',
-        manager: 'John Doe'
-      },
-      'LD001': { 
-        id: 3,
-        employeeId: 'LD001',
-        password: 'lead123',
-        name: 'Mike Johnson',
-        role: 'Team Lead',
-        department: 'Core Systems',
-        email: 'mike.johnson@spaceborn.com',
-        phone: '+1 555 000 0003',
-        joinDate: '2022-01-10',
-        status: 'Active',
-        manager: 'Jane Smith'
-      },
-      'EMP001': { 
-        id: 4,
-        employeeId: 'EMP001',
-        password: 'member123',
-        name: 'Ravi Das',
-        role: 'Member',
-        department: 'Core Systems',
-        email: 'ravi.das@spaceborn.com',
-        phone: '+91 98765 43213',
-        joinDate: '2024-01-05',
-        status: 'Active',
-        manager: 'Mike Johnson'
-      },
-      'EMP002': { 
-        id: 5,
-        employeeId: 'EMP002',
-        password: 'member123',
-        name: 'Priya Sharma',
-        role: 'Member',
-        department: 'Core Systems',
-        email: 'priya.sharma@spaceborn.com',
-        phone: '+91 98765 43210',
-        joinDate: '2023-01-15',
-        status: 'Active',
-        manager: 'Mike Johnson'
-      },
-      'EMP003': { 
-        id: 6,
-        employeeId: 'EMP003',
-        password: 'member123',
-        name: 'Nisha Kumar',
-        role: 'Member',
-        department: 'Core Systems',
-        email: 'nisha.kumar@spaceborn.com',
-        phone: '+91 98765 43214',
-        joinDate: '2023-08-12',
-        status: 'Active',
-        manager: 'Mike Johnson'
-      },
-      'HR001': { 
-        id: 7,
-        employeeId: 'HR001',
-        password: 'hr123',
-        name: 'Neha Gupta',
-        role: 'HR',
-        department: 'Robotics & Simulation',
-        email: 'neha.gupta@spaceborn.com',
-        phone: '+91 98765 43215',
-        joinDate: '2022-06-01',
-        status: 'Active',
-        manager: 'Jane Smith'
-      }
-    };
-    
     // Bind methods
     this.login = this.login.bind(this);
     this.logout = this.logout.bind(this);
     this.verifyToken = this.verifyToken.bind(this);
     this.changePassword = this.changePassword.bind(this);
-    this.resetEmployeePassword = this.resetEmployeePassword.bind(this);
     this.forgotPassword = this.forgotPassword.bind(this);
     this.refreshToken = this.refreshToken.bind(this);
     this.getActiveSessions = this.getActiveSessions.bind(this);
@@ -197,7 +87,6 @@ class AuthService {
     localStorage.removeItem('authToken');
     localStorage.removeItem('user');
     localStorage.removeItem('userSession');
-    localStorage.removeItem('rememberedEmployeeId');
   }
 
   // Check if account is locked
@@ -225,56 +114,8 @@ class AuthService {
     return password;
   }
 
-  // Mock login for development without backend (Employee ID based)
-  async mockLogin(employeeId, password, rememberMe = false) {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const user = this.mockUsers[employeeId.toUpperCase()];
-    
-    if (user && user.password === password) {
-      this.resetLoginAttempts();
-      
-      const { password: _, ...userWithoutPassword } = user;
-      
-      if (rememberMe) {
-        localStorage.setItem('rememberedEmployeeId', employeeId);
-      } else {
-        localStorage.removeItem('rememberedEmployeeId');
-      }
-      
-      const mockToken = 'mock-jwt-token-' + Date.now();
-      this.setSession(userWithoutPassword, mockToken, rememberMe);
-      
-      return {
-        success: true,
-        user: userWithoutPassword,
-        message: 'Login successful (Mock Mode)'
-      };
-    }
-    
-    this.loginAttempts++;
-    
-    if (this.loginAttempts >= this.MAX_LOGIN_ATTEMPTS) {
-      this.lockoutUntil = Date.now() + this.LOCKOUT_DURATION;
-      return {
-        success: false,
-        error: `Too many failed attempts. Account locked for ${this.LOCKOUT_DURATION / 60000} minutes.`
-      };
-    }
-    
-    const remainingAttempts = this.MAX_LOGIN_ATTEMPTS - this.loginAttempts;
-    return {
-      success: false,
-      error: `Invalid Employee ID or Password. ${remainingAttempts} attempts remaining.`
-    };
-  }
-
   // Login user with Employee ID
   async login(employeeId, password, rememberMe = false) {
-    if (this.USE_MOCK) {
-      console.log('Using mock authentication (Employee ID based)');
-      return await this.mockLogin(employeeId, password, rememberMe);
-    }
     
     if (!employeeId || !password) {
       return { success: false, error: 'Employee ID and password are required' };
@@ -343,7 +184,7 @@ class AuthService {
         message: 'Login successful'
       };
     } catch (error) {
-      console.error('Login error:', error);
+      console.error('Sign-in request failed.');
       return { success: false, error: error.message };
     }
   }
@@ -353,17 +194,8 @@ class AuthService {
     return localStorage.getItem('rememberedEmployeeId') || '';
   }
 
-  // Mock logout
-  async mockLogout() {
-    this.clearSession();
-    return { success: true };
-  }
-
   // Logout user
   async logout() {
-    if (this.USE_MOCK) {
-      return await this.mockLogout();
-    }
     
     const token = this.getToken();
     
@@ -381,29 +213,8 @@ class AuthService {
     }
   }
 
-  // Mock verify token
-  async mockVerifyToken() {
-    const session = localStorage.getItem('userSession');
-    if (session) {
-      const sessionData = JSON.parse(session);
-      const sessionAge = Date.now() - sessionData.timestamp;
-      const timeout = sessionData.rememberMe ? sessionData.sessionDuration : this.SESSION_TIMEOUT;
-      
-      if (sessionAge >= timeout) {
-        this.clearSession();
-        return { success: false, error: 'Session expired' };
-      }
-      
-      return { success: true, user: sessionData };
-    }
-    return { success: false, error: 'No session found' };
-  }
-
   // Verify token and get user data
   async verifyToken({ signal } = {}) {
-    if (this.USE_MOCK) {
-      return await this.mockVerifyToken();
-    }
     
     const token = this.getToken();
     
@@ -416,10 +227,7 @@ class AuthService {
     if (storedSession) {
       try {
         session = JSON.parse(storedSession);
-        const sessionAge = Date.now() - session.timestamp;
-        const timeout = session.rememberMe ? session.sessionDuration : this.SESSION_TIMEOUT;
-        
-        if (sessionAge >= timeout) {
+        if (Number.isFinite(session.sessionExpiresAt) && Date.now() >= session.sessionExpiresAt) {
           this.clearSession();
           return { success: false, error: 'Session expired' };
         }
@@ -465,31 +273,8 @@ class AuthService {
     }
   }
 
-  // Mock change password
-  async mockChangePassword(currentPassword, newPassword) {
-    await new Promise(resolve => setTimeout(resolve, 800));
-    
-    const currentUser = this.getCurrentUser();
-    const user = this.mockUsers[currentUser?.employeeId];
-    
-    if (user && user.password === currentPassword) {
-      this.mockUsers[currentUser.employeeId].password = newPassword;
-      return {
-        success: true,
-        message: 'Password changed successfully!'
-      };
-    }
-    return {
-      success: false,
-      error: 'Current password is incorrect'
-    };
-  }
-
   // Change password for current user
   async changePassword(currentPassword, newPassword) {
-    if (this.USE_MOCK) {
-      return await this.mockChangePassword(currentPassword, newPassword);
-    }
     
     const token = this.getToken();
     
@@ -501,8 +286,8 @@ class AuthService {
       return { success: false, error: 'All password fields are required' };
     }
 
-    if ([...newPassword.normalize('NFC')].length < 15) {
-      return { success: false, error: 'New password must be at least 15 characters' };
+    if ([...newPassword.normalize('NFC')].length < 8 || [...newPassword.normalize('NFC')].length > 64) {
+      return { success: false, error: 'Use 8 to 64 characters for the new password.' };
     }
 
     if (currentPassword === newPassword) {
@@ -535,61 +320,6 @@ class AuthService {
     }
   }
 
-  // Reset employee password (Manager/CEO only)
-  async resetEmployeePassword(employeeId, newPassword) {
-    if (!employeeId || !newPassword) {
-      return { success: false, error: 'Employee ID and new password are required' };
-    }
-    
-    if ([...newPassword.normalize('NFC')].length < 15) {
-      return { success: false, error: 'Password must be at least 15 characters' };
-    }
-    
-    const currentUser = this.getCurrentUser();
-    if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-      return { success: false, error: 'Only CEO, COO and Managers can reset passwords' };
-    }
-    
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 800));
-      
-      const user = this.mockUsers[employeeId.toUpperCase()];
-      if (!user) {
-        return { success: false, error: 'Employee ID not found' };
-      }
-      
-      this.mockUsers[employeeId.toUpperCase()].password = newPassword;
-      return { 
-        success: true, 
-        message: `Password reset successfully for ${user.name}. New password: ${newPassword}` 
-      };
-    }
-    
-    const token = this.getToken();
-    if (!token) {
-      return { success: false, error: 'Not authenticated' };
-    }
-    
-    try {
-      const response = await fetch(`${this.API_BASE_URL}/auth/reset-password`, {
-        method: 'POST',
-        headers: this.getAuthHeaders(),
-        body: JSON.stringify({ employeeId: employeeId.toUpperCase(), newPassword }),
-      });
-      
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Password reset failed');
-      }
-      
-      return { success: true, message: data.message || `Password reset successfully for employee ${employeeId}` };
-    } catch (error) {
-      console.error('Reset password error:', error);
-      return { success: false, error: error.message };
-    }
-  }
-
   async forgotPassword(employeeId) {
     try {
       const response = await fetch(`${this.API_BASE_URL}/auth/forgot-password`, {
@@ -606,9 +336,6 @@ class AuthService {
 
   // Refresh token
   async refreshToken() {
-    if (this.USE_MOCK) {
-      return { success: true, token: 'mock-refreshed-token-' + Date.now() };
-    }
     
     const token = this.getToken();
     
@@ -738,61 +465,18 @@ class AuthService {
 
   // Check if mock mode is enabled
   isMockMode() {
-    return this.USE_MOCK;
+    return false;
   }
 
   // Get all mock users (for manager to reset passwords)
   getMockUsers() {
-    return this.mockUsers;
+    return {};
   }
 
   // ========== LOGIN MANAGEMENT METHODS ==========
 
   // Get all active sessions (Manager/Admin only)
   async getActiveSessions() {
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const currentUser = this.getCurrentUser();
-      const sessions = [];
-      
-      Object.values(this.mockUsers).forEach(user => {
-        if (user.employeeId !== currentUser?.employeeId) {
-          sessions.push({
-            id: Math.floor(Math.random() * 1000),
-            employeeId: user.employeeId,
-            name: user.name,
-            role: user.role,
-            department: user.department,
-            loginTime: new Date(Date.now() - Math.random() * 3600000).toLocaleString(),
-            lastActivity: new Date(Date.now() - Math.random() * 1800000).toLocaleString(),
-            ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-            device: ['Chrome / Windows', 'Firefox / Mac', 'Safari / iOS', 'Edge / Windows'][Math.floor(Math.random() * 4)],
-            status: 'active',
-            sessionId: `sess_${Math.random().toString(36).substr(2, 9)}`
-          });
-        }
-      });
-      
-      if (currentUser) {
-        sessions.push({
-          id: 999,
-          employeeId: currentUser.employeeId,
-          name: currentUser.name,
-          role: currentUser.role,
-          department: currentUser.department,
-          loginTime: displayDateTime(new Date()),
-          lastActivity: displayDateTime(new Date()),
-          ipAddress: '127.0.0.1',
-          device: navigator.userAgent,
-          status: 'active',
-          sessionId: 'current_session',
-          isCurrentUser: true
-        });
-      }
-      
-      return sessions;
-    }
     
     const token = this.getToken();
     if (!token) {
@@ -818,55 +502,6 @@ class AuthService {
 
   // Get login history
   async getLoginHistory(params = {}) {
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const history = [];
-      const now = new Date();
-      
-      Object.values(this.mockUsers).forEach((user, index) => {
-        for (let i = 0; i < 3; i++) {
-          const loginDate = new Date(now);
-          loginDate.setDate(now.getDate() - Math.floor(Math.random() * 7));
-          loginDate.setHours(Math.floor(Math.random() * 12) + 8, Math.floor(Math.random() * 60));
-          
-          const logoutDate = new Date(loginDate);
-          logoutDate.setHours(loginDate.getHours() + Math.floor(Math.random() * 8) + 4);
-          
-          const duration = Math.floor((logoutDate - loginDate) / 60000);
-          const hours = Math.floor(duration / 60);
-          const minutes = duration % 60;
-          
-          history.push({
-            id: history.length + 1,
-            employeeId: user.employeeId,
-            name: user.name,
-            role: user.role,
-            department: user.department,
-            loginTime: loginDate.toLocaleString(),
-            logoutTime: i === 0 && Math.random() > 0.3 ? null : logoutDate.toLocaleString(),
-            duration: i === 0 && Math.random() > 0.3 ? 'Active' : `${hours}h ${minutes}m`,
-            ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-            status: i === 0 && Math.random() > 0.3 ? 'active' : ['completed', 'completed', 'forced'][Math.floor(Math.random() * 3)]
-          });
-        }
-      });
-      
-      let filteredHistory = history;
-      if (params.employeeId) {
-        filteredHistory = filteredHistory.filter(h => h.employeeId === params.employeeId);
-      }
-      if (params.from) {
-        const fromDate = new Date(params.from);
-        filteredHistory = filteredHistory.filter(h => new Date(h.loginTime) >= fromDate);
-      }
-      if (params.to) {
-        const toDate = new Date(params.to);
-        filteredHistory = filteredHistory.filter(h => new Date(h.loginTime) <= toDate);
-      }
-      
-      return filteredHistory.sort((a, b) => new Date(b.loginTime) - new Date(a.loginTime));
-    }
     
     const token = this.getToken();
     if (!token) {
@@ -895,19 +530,6 @@ class AuthService {
 
   // Force logout a user (Manager/Admin only)
   async forceLogout(sessionId) {
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const currentUser = this.getCurrentUser();
-      if (!currentUser || (currentUser.role !== 'CEO' && currentUser.role !== 'Manager' && currentUser.role !== 'COO')) {
-        throw new Error('Only CEO, COO and Managers can force logout users');
-      }
-      
-      return {
-        success: true,
-        message: 'User has been forced logged out'
-      };
-    }
     
     const token = this.getToken();
     if (!token) {
@@ -939,16 +561,6 @@ class AuthService {
 
   // Get active sessions count
   async getActiveSessionsCount() {
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 300));
-      
-      const currentUser = this.getCurrentUser();
-      let count = Object.keys(this.mockUsers).length;
-      if (currentUser) {
-        count = count - 1;
-      }
-      return { count: Math.max(1, count) };
-    }
     
     const token = this.getToken();
     if (!token) {
@@ -974,31 +586,6 @@ class AuthService {
 
   // Get session details for a specific user (Manager/Admin only)
   async getUserSessions(employeeId) {
-    if (this.USE_MOCK) {
-      await new Promise(resolve => setTimeout(resolve, 500));
-      
-      const user = this.mockUsers[employeeId.toUpperCase()];
-      if (!user) {
-        throw new Error('User not found');
-      }
-      
-      const sessions = [];
-      for (let i = 0; i < Math.floor(Math.random() * 3) + 1; i++) {
-        sessions.push({
-          id: Math.floor(Math.random() * 1000),
-          employeeId: user.employeeId,
-          name: user.name,
-          loginTime: new Date(Date.now() - Math.random() * 86400000).toLocaleString(),
-          lastActivity: new Date(Date.now() - Math.random() * 3600000).toLocaleString(),
-          ipAddress: `192.168.1.${Math.floor(Math.random() * 255)}`,
-          device: ['Chrome / Windows', 'Firefox / Mac', 'Safari / iOS'][Math.floor(Math.random() * 3)],
-          status: 'active',
-          sessionId: `sess_${Math.random().toString(36).substr(2, 9)}`
-        });
-      }
-      
-      return sessions;
-    }
     
     const token = this.getToken();
     if (!token) {
