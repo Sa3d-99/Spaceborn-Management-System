@@ -1,8 +1,7 @@
-import { AlertTriangle as IconAlertTriangle } from '../../Common/Icons';
 import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Member/MemberDashboard.js
-import React, { useState, useEffect } from 'react';
-import authService from '../../../services/authService';
+import React, { useState } from 'react';
+import useDashboardData from '../useDashboardData';
 import taskService from '../../../services/taskService';
 import {
   getTaskId,
@@ -10,186 +9,28 @@ import {
 } from '../../../utils/taskMapper';
 import { roleLabel } from '../../../utils/roleLabels';
 
-const MemberDashboard = () => {
-  const [memberData, setMemberData] = useState({
-    name: '',
-    role: '',
-    title: '',
-    description: '',
-    // ensure this is always an array (backend might return unexpected payload)
-    myTasks: [],
-
-    sprintOverview: {
-      overallProgress: 0,
-      tasksOnTime: 0,
-      hoursLogged: 0
-    },
-    upcomingDeadlines: []
-  });
-  
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
-
-  // Fetch member dashboard data from API
-  useEffect(() => {
-    fetchDashboardData();
-  }, []);
-
-  const fetchDashboardData = async () => {
-    setIsLoading(true);
-    setError(null);
-    
-    try {
-      const token = authService.getToken();
-      const currentUser = authService.getCurrentUser();
-      
-      if (!token || !currentUser) {
-        console.error('No authentication token or user found');
-        if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-          loadMockData();
-        }
-        setIsLoading(false);
-        return;
-      }
-
-      const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-      
-      // Fetch user profile
-      const profileResponse = await fetch(`${API_BASE_URL}/member/profile`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (profileResponse.ok) {
-        const profile = await profileResponse.json();
-        setMemberData(prev => ({
-          ...prev,
-          name: profile.name,
-          role: profile.role,
-          title: profile.title,
-          description: profile.description
-        }));
-      }
-
-      // Fetch my tasks via backend task routes
-      try {
-        const tasks = normalizeTaskList(await taskService.getMyAssignedTasks());
-        setMemberData(prev => ({
-          ...prev,
-          myTasks: tasks,
-        }));
-      } catch (taskErr) {
-        console.error('Error fetching member tasks:', taskErr);
-      }
-
-      // Fetch sprint overview
-      const sprintResponse = await fetch(`${API_BASE_URL}/member/sprint-overview`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (sprintResponse.ok) {
-        const sprintData = await sprintResponse.json();
-        setMemberData(prev => ({
-          ...prev,
-          sprintOverview: sprintData
-        }));
-      }
-
-      // Fetch upcoming deadlines
-      const deadlinesResponse = await fetch(`${API_BASE_URL}/member/upcoming-deadlines`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      
-      if (deadlinesResponse.ok) {
-        const deadlines = await deadlinesResponse.json();
-        setMemberData(prev => ({
-          ...prev,
-          upcomingDeadlines: deadlines
-        }));
-      }
-
-    } catch (error) {
-      console.error('Error fetching dashboard data:', error);
-      setError('Failed to load dashboard data');
-      
-      // If API fails and mock mode is enabled, load mock data
-      if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        loadMockData();
-      }
-    } finally {
-      setIsLoading(false);
-    }
+const MemberDashboard = ({ user }) => {
+  const { data, error, reload } = useDashboardData('/dashboard/member', 'Could not load the dashboard.');
+  const [actionError, setActionError] = useState('');
+  const memberData = {
+    ...data?.profile,
+    name: user.name || user.employeeId,
+    role: user.role,
+    title: [user.department, user.designation].filter(Boolean).join(' · '),
+    myTasks: normalizeTaskList(data?.myTasks || []),
+    sprintOverview: data?.sprintOverview || {},
+    upcomingDeadlines: data?.upcomingDeadlines || []
   };
 
-  // Mock data for development (only used when backend is not available)
-  const loadMockData = () => {
-    const currentUser = authService.getCurrentUser();
-    
-    setMemberData({
-      name: currentUser?.name || 'Ravi Das',
-      role: currentUser?.role || 'Member',
-      title: `${currentUser?.department || 'Core Systems'} · Joined ${displayDate(new Date(), 'en-US', { month: 'short', year: 'numeric' })}`,
-      description: 'Frontend developer passionate about building clean, accessible interfaces. Currently focused on the authentication and dashboard modules.',
-      myTasks: normalizeTaskList([
-        {
-          id: 1,
-          title: 'Build login UI',
-          status: 'In progress',
-          progress: 74,
-          dueDate: '2026-05-28',
-          priority: 'high',
-        },
-        {
-          id: 2,
-          title: 'API Integration',
-          status: 'Pending',
-          progress: 0,
-          dueDate: '2026-06-05',
-          priority: 'medium',
-        },
-        {
-          id: 3,
-          title: 'Code Review',
-          status: 'Completed',
-          progress: 100,
-          dueDate: '2026-05-25',
-          priority: 'low',
-        },
-      ]),
-      sprintOverview: {
-        overallProgress: 68,
-        tasksOnTime: 85,
-        hoursLogged: 72
-      },
-      upcomingDeadlines: [
-        { id: 1, name: 'Build login UI', dueDate: 'May 28', priority: 'high' },
-        { id: 2, name: 'API Integration', dueDate: 'Jun 5', priority: 'medium' }
-      ]
-    });
-  };
-
-  // Update task progress
-  const updateTaskProgress = async (taskId, newProgress) => {
+  async function updateTaskProgress(taskId, newProgress) {
+    setActionError('');
     try {
       await taskService.updateTaskProgress(taskId, newProgress);
-      setMemberData(prev => ({
-        ...prev,
-        myTasks: prev.myTasks.map(task =>
-          getTaskId(task) === taskId ? { ...task, progress: newProgress } : task
-        ),
-      }));
-    } catch (error) {
-      console.error('Error updating task:', error);
+      reload();
+    } catch {
+      setActionError('Could not update task progress. Try again.');
     }
-  };
+  }
 
   const getStatusColor = (status) => {
     switch(status?.toLowerCase()) {
@@ -209,39 +50,19 @@ const MemberDashboard = () => {
     }
   };
 
-  if (isLoading) {
-    return (
-      <div className="flex items-center justify-center h-96">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-600"></div>
-      </div>
-    );
-  }
-
-  if (error && memberData.name === '') {
-    return (
-      <div className="bg-white rounded-xl border border-red-200 p-8 text-center">
-        <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4">
-          <IconAlertTriangle className="w-8 h-8 text-red-600" />
-        </div>
-        <h3 className="text-lg font-semibold text-gray-900 mb-2">Unable to Load Dashboard</h3>
-        <p className="text-gray-600 mb-4">{error}</p>
-        <button 
-          onClick={fetchDashboardData}
-          className="btn btn-sm btn-ghost px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
+  if (error) return <div className="alert alert-error" role="alert">{error}
+    <button className="btn btn-sm" onClick={reload}>Try again</button>
+  </div>;
+  if (!data) return <p role="status">Loading dashboard…</p>;
 
   return (
     <div>
+      {actionError && <p className="alert alert-error" role="alert">{actionError}</p>}
       {/* Profile Header - Member Theme (Cyan) */}
       <div className="bg-white rounded-xl border border-gray-200 p-6 mb-8">
         <div className="flex items-start space-x-4">
           <div className="w-16 h-16 bg-gradient-to-br from-cyan-500 to-blue-500 rounded-full flex items-center justify-center text-white text-2xl font-bold">
-            {memberData.name.split(' ').map(n => n[0]).join('')}
+            {memberData.name?.split(' ').filter(Boolean).slice(0, 2).map(part => part[0]).join('')}
           </div>
           <div className="flex-1">
             <div className="flex items-center justify-between">
@@ -344,7 +165,7 @@ const MemberDashboard = () => {
             </div>
             <div>
               <div className="flex justify-between text-sm mb-1">
-                <span className="text-gray-600">Hours logged</span>
+                <span className="text-gray-600">Estimated task hours</span>
                 <span className="font-medium text-purple-600">{memberData.sprintOverview.hoursLogged}</span>
               </div>
               <div className="w-full bg-gray-200 rounded-full h-2">

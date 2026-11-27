@@ -7,6 +7,7 @@ import { Eye, EyeOff } from '../Common/Icons';
 import { displayTime } from '../../utils/timeZone';
 import { normalizeDepartmentFields } from '../../utils/departments';
 
+const apiBase = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 const currentPath = () => window.location.pathname.replace(/\/+$/, '') || '/';
 
 const LoginSystem = ({ onLoginSuccess }) => {
@@ -17,9 +18,9 @@ const LoginSystem = ({ onLoginSuccess }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [rememberMe, setRememberMe] = useState(false);
-  const [loginAttempts, setLoginAttempts] = useState(0);
-  const [isLocked, setIsLocked] = useState(false);
-  const [lockoutTime, setLockoutTime] = useState(null);
+  const [challenge, setChallenge] = useState(null);
+  const [verificationCode, setVerificationCode] = useState('');
+  const [enrolledSession, setEnrolledSession] = useState(null);
   const [pathname, setPathname] = useState(currentPath);
 
   useEffect(() => {
@@ -36,123 +37,87 @@ const LoginSystem = ({ onLoginSuccess }) => {
     return () => window.removeEventListener('popstate', syncPath);
   }, []);
 
-  const isAccountLocked = () => {
-    if (isLocked && lockoutTime && Date.now() < lockoutTime) {
-      const remainingMinutes = Math.ceil((lockoutTime - Date.now()) / 60000);
-      return { locked: true, remainingMinutes };
-    }
-    return { locked: false };
-  };
-
-  // Auto-mark attendance on login
-  const markAttendance = async (user, token) => {
-    try {
-      const API_BASE_URL = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
-      await fetch(`${API_BASE_URL}/attendance/auto-mark`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${token}`
-        },
-        body: JSON.stringify({
-          userId: String(user.id),
-          userName: user.name,
-          employeeId: user.employeeId,
-          department: user.department,
-          role: user.role
-        })
-      });
-    } catch (e) {
-      console.log('Attendance mark skipped:', e.message);
-    }
-  };
-
-  const signIn = async (identifier, enteredPassword, openTeam = false) => {
-    const lockStatus = isAccountLocked();
-    if (lockStatus.locked) {
-      setError(`Too many failed attempts. Account locked for ${lockStatus.remainingMinutes} minutes.`);
+  function finishSignIn(data, context) {
+    const { user: account, token, expiresAt } = data;
+    if (!account || !token) {
+      setError('The sign-in service returned an incomplete response. Try again.');
       return;
     }
-    
+    const user = normalizeDepartmentFields(account);
+    localStorage.setItem('authToken', token);
+    localStorage.setItem('user', JSON.stringify(user));
+    localStorage.setItem('userSession', JSON.stringify({
+      ...user,
+      isAuthenticated: true,
+      timestamp: Date.now(),
+      sessionExpiresAt: expiresAt,
+      loginTime: displayTime(new Date())
+    }));
+    if (rememberMe) localStorage.setItem('rememberedEmployeeId', context.identifier);
+    else localStorage.removeItem('rememberedEmployeeId');
+
+    if (context.openTeam) navigate('/', true);
+    onLoginSuccess(user, context.openTeam);
+
+  }
+
+  async function authenticate(path, credentials, context) {
     setError('');
     setIsLoading(true);
-
-    const API_BASE_URL = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
-
     try {
-      const response = await fetch(`${API_BASE_URL}/auth/login`, {
+      const response = await fetch(apiBase + path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ 
-          employeeId: identifier.trim(),
-          password: enteredPassword
-        }),
+        body: JSON.stringify(credentials)
       });
-
-      if (!response.headers.get('content-type')?.includes('application/json')) {
-        setError('The sign-in service did not respond. Open the CRM from its running server and try again.');
-        return;
-      }
-      const data = await response.json();
-
-      if (!response.ok && response.status !== 401) {
-        setError(data.message || 'Sign-in is temporarily unavailable. Try again.');
+      const result = await response.json().catch(() => null);
+      if (!result) {
+        setError('The sign-in service did not respond. Try again when the API is available.');
         return;
       }
       if (!response.ok) {
-        const newAttempts = loginAttempts + 1;
-        setLoginAttempts(newAttempts);
-        
-        if (newAttempts >= 5) {
-          const lockDuration = 15 * 60 * 1000;
-          setLockoutTime(Date.now() + lockDuration);
-          setIsLocked(true);
-          setError(`Too many failed attempts. Account locked for 15 minutes.`);
-        } else {
-          setError(data.message || `Invalid sign-in details. ${5 - newAttempts} attempts remaining.`);
+        setError(result.message || 'Sign-in failed. Try again.');
+        if (path === '/auth/two-factor/verify' && response.status === 401 && result.error !== 'INVALID_TWO_FACTOR_CODE') {
+          setChallenge(null);
+          navigate('/', true);
         }
         return;
       }
-
-      setLoginAttempts(0);
-      setIsLocked(false);
-      
-      const { user: account, token } = data.data || {};
-      if (!account || !token) {
-        setError('The sign-in service returned an incomplete response. Try again.');
+      const data = result.data || {};
+      if (data.twoFactor) {
+        setChallenge({ ...data.twoFactor, ...context });
+        setVerificationCode('');
+        setPassword('');
         return;
       }
-      const user = normalizeDepartmentFields(account);
-
-      localStorage.setItem('authToken', token);
-      localStorage.setItem('user', JSON.stringify(user));
-      localStorage.setItem('userSession', JSON.stringify({
-        ...user,
-        isAuthenticated: true,
-        timestamp: Date.now(),
-        loginTime: displayTime(new Date())
-      }));
-
-      if (rememberMe) {
-        localStorage.setItem('rememberedEmployeeId', identifier);
-      } else {
-        localStorage.removeItem('rememberedEmployeeId');
-      }
-
-      if (openTeam) navigate('/', true);
-      onLoginSuccess(user, openTeam);
-      markAttendance(user, token);
-      
-    } catch (error) {
-      console.error('Login error:', error);
+      setChallenge(null);
+      setVerificationCode('');
+      setPassword('');
+      if (data.backupCodes?.length) setEnrolledSession({ data, context });
+      else finishSignIn(data, context);
+    } catch {
       setError('Could not reach the sign-in service. Check your connection and try again.');
     } finally {
       setIsLoading(false);
     }
+  }
+
+  const signIn = (identifier, enteredPassword, openTeam = false) => authenticate(
+    '/auth/login', { employeeId: identifier.trim(), password: enteredPassword }, { identifier, openTeam }
+  );
+
+  const verifyCode = event => {
+    event.preventDefault();
+    const { challengeToken, identifier, openTeam } = challenge;
+    authenticate('/auth/two-factor/verify', { challengeToken, code: verificationCode }, { identifier, openTeam });
   };
 
   const handleSubmit = event => {
     event.preventDefault();
+    if (!employeeId.trim() || !password) {
+      setError('Please provide employee ID and password');
+      return;
+    }
     signIn(employeeId, password, employeeId.trim().toUpperCase() === setupEmployeeId);
   };
 
@@ -173,7 +138,49 @@ const LoginSystem = ({ onLoginSuccess }) => {
     setError('');
   };
 
-  const lockStatus = isAccountLocked();
+  if (challenge || enrolledSession) {
+    return (
+      <main className="grid min-h-screen place-items-center bg-base-200 p-4">
+        <section className="card w-full max-w-md border border-base-300 bg-base-100">
+          <div className="card-body gap-4">
+            <h1 className="card-title">{enrolledSession ? 'Save your backup codes' : 'Two-factor authentication'}</h1>
+            {error && <p className="alert alert-error" role="alert">{error}</p>}
+            {enrolledSession ? (
+              <>
+                <p>Keep these codes somewhere safe. Each one can be used once if you lose access to your authenticator.</p>
+                <ul className="grid grid-cols-2 gap-2 rounded-box bg-base-200 p-3 font-mono">
+                  {enrolledSession.data.backupCodes.map(code => <li key={code}>{code}</li>)}
+                </ul>
+                <button type="button" className="btn btn-neutral"
+                  onClick={() => finishSignIn(enrolledSession.data, enrolledSession.context)}>I saved my codes</button>
+              </>
+            ) : (
+              <form className="grid gap-4" onSubmit={verifyCode}>
+                {challenge.setup && (
+                  <div>
+                    <p>Add a time-based account to your authenticator app. Use {challenge.accountLabel} as the account name.</p>
+                    <p className="mt-2 break-all rounded-box bg-base-200 p-3 font-mono">{challenge.setupKey}</p>
+                  </div>
+                )}
+                <label className="grid gap-1">
+                  {challenge.setup ? 'Authenticator code' : 'Authenticator or backup code'}
+                  <input className="input w-full" autoComplete="one-time-code" autoCapitalize="characters"
+                    inputMode={challenge.setup ? 'numeric' : 'text'} maxLength={challenge.setup ? 6 : 11} value={verificationCode}
+                    onChange={event => setVerificationCode(event.target.value)} required />
+                </label>
+                <button className="btn btn-neutral" type="submit" disabled={isLoading}>Verify</button>
+                <button className="btn btn-ghost" type="button" disabled={isLoading} onClick={() => {
+                  setChallenge(null);
+                  setVerificationCode('');
+                  handleBackToLogin();
+                }}>Back to sign in</button>
+              </form>
+            )}
+          </div>
+        </section>
+      </main>
+    );
+  }
 
   if (pathname === '/signup') return <Signup onBack={handleBackToLogin} />;
   if (pathname === '/forgot-password') {
@@ -195,7 +202,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
         <div className="card block bg-base-100 shadow-sm border border-base-300 p-8">
           <div className="text-center mb-6">
             <h2 className="text-xl font-semibold text-gray-900">Employee Login</h2>
-            <p className="text-sm text-gray-500 mt-1">Enter your credentials to access your dashboard</p>
+            <p className="text-sm text-gray-500 mt-1">Shift hours 8:00 AM – 12:00 AM IST</p>
           </div>
           
           {error && (
@@ -204,13 +211,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
             </div>
           )}
 
-          {lockStatus.locked && (
-            <div className="alert alert-error mb-4 text-sm" role="alert">
-              ⚠️ Account locked for {lockStatus.remainingMinutes} minutes due to multiple failed attempts.
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
+          <form onSubmit={handleSubmit} noValidate className="space-y-5">
             <div>
               <label className="block text-sm font-medium text-gray-700 mb-1.5" htmlFor="login-id">Employee ID or email</label>
               <input
@@ -222,7 +223,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
                 className="input w-full"
                 placeholder="Employee ID or email"
                 required
-                disabled={isLoading || lockStatus.locked}
+                disabled={isLoading}
                 autoCapitalize="none"
               />
             </div>
@@ -239,7 +240,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
                   className="input w-full pr-12"
                   placeholder="Enter your password"
                   required
-                  disabled={isLoading || lockStatus.locked}
+                  disabled={isLoading}
                 />
                 <button
                   type="button"
@@ -257,9 +258,12 @@ const LoginSystem = ({ onLoginSuccess }) => {
                 <input 
                   type="checkbox" 
                   checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
+                  onChange={event => {
+                  setRememberMe(event.target.checked);
+                  if (!event.target.checked) localStorage.removeItem('rememberedEmployeeId');
+                }}
                   className="checkbox checkbox-sm"
-                  disabled={isLoading || lockStatus.locked}
+                  disabled={isLoading}
                 />
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
@@ -275,7 +279,7 @@ const LoginSystem = ({ onLoginSuccess }) => {
 
             <button
               type="submit"
-              disabled={isLoading || lockStatus.locked}
+              disabled={isLoading}
               className="btn btn-neutral w-full mt-6"
             >
               {isLoading ? (

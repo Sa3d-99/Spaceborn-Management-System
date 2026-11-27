@@ -186,9 +186,13 @@ const notifyResourceDecision = async (request, status) => {
 };
 
 const notifyReportSubmitted = async (report) => {
-  if (report.userRole !== 'Member') return [];
+  if (!report.department) return [];
+  const active = { isActive: true, department: report.department };
+  const leaders = ['Team Lead', 'CO Head', 'Co-Head'];
+  const roles = leaders.includes(report.userRole) ? ['Manager'] : [...leaders, 'Manager'];
+  const recipients = await User.find({ ...active, role: { $in: roles } }).select('_id');
 
-  return notifyRoles(['Team Lead'], {
+  return notifyUsers(recipients.filter(user => String(user.id) !== String(report.userId)), {
     title: 'Department Report Submitted',
     message: `${report.userName} submitted a daily report`,
     description: report.completedTasks || report.ongoingWork || 'Daily report is ready for review',
@@ -197,11 +201,12 @@ const notifyReportSubmitted = async (report) => {
     actionUrl: '/reports',
     actionLabel: 'View Report',
     details: {
+      reportId: report.id,
       employee: report.userName,
       department: report.department,
       date: report.date
     }
-  }, { department: report.department });
+  });
 };
 
 const notifyMvpSubmitted = async (roadmap, submittedBy) => {

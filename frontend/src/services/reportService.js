@@ -1,5 +1,5 @@
 // src/services/reportService.js
-const API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
+const API_BASE_URL = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 
 const apiRequest = async (endpoint, options = {}) => {
   const token = localStorage.getItem('authToken');
@@ -19,7 +19,9 @@ const apiRequest = async (endpoint, options = {}) => {
   
   if (!response.ok) {
     const error = await response.json().catch(() => ({ message: 'API request failed' }));
-    throw new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+    const failure = new Error(error.message || `HTTP ${response.status}: ${response.statusText}`);
+    failure.status = response.status;
+    throw failure;
   }
   
   const data = await response.json();
@@ -38,7 +40,8 @@ export const reportService = {
     try {
       return await apiRequest(`/reports/user/${userId}/today`);
     } catch (e) {
-      return null;
+      if (e.status === 404) return null;
+      throw e;
     }
   },
 
@@ -50,8 +53,9 @@ export const reportService = {
     return apiRequest(`/reports/department/${encodeURIComponent(department)}`);
   },
 
-  getAllReports: async () => {
-    return apiRequest('/reports');
+  getAllReports: async (filters = {}, options = {}) => {
+    const query = new URLSearchParams(filters).toString();
+    return apiRequest(`/reports${query ? '?' + query : ''}`, options);
   },
 
   updateReport: async (reportId, updatedData) => {
@@ -67,14 +71,8 @@ export const reportService = {
     });
   },
 
-  getComplianceReport: async (department = null) => {
-    let url = '/reports/compliance';
-    if (department) url += `?department=${encodeURIComponent(department)}`;
-    try {
-      return await apiRequest(url);
-    } catch (e) {
-      return { submittedThisMonth: 0, expectedThisMonth: 22, percentage: 0, streak: 0 };
-    }
+  getComplianceReport: async (filters = { scope: 'mine' }, options = {}) => {
+    return apiRequest(`/reports/compliance?${new URLSearchParams(filters)}`, options);
   },
 };
 

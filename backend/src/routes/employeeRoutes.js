@@ -1,6 +1,7 @@
 const express = require('express');
 const multer = require('multer');
 const router = express.Router();
+const { extname } = require('node:path');
 
 const { protect, authorize } = require('../middleware/authMiddleware');
 const {
@@ -23,40 +24,44 @@ const {
   importEmployees,
 } = require('../controllers/userController');
 
-const upload = multer({
-  storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
-  fileFilter: (_req, file, cb) => {
-    const allowedMimeTypes = [
-      'application/pdf',
-      'image/jpeg',
-      'image/png',
-      'application/msword',
-      'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
-    ];
-    cb(null, allowedMimeTypes.includes(file.mimetype));
-  }
-});
+const oneFile = (field, limit, extensions, sizeMessage, typeMessage) => {
+  const upload = multer({ storage: multer.memoryStorage(), limits: { files: 1, fileSize: limit + 1 } }).single(field);
+  return (req, res, next) => upload(req, res, error => {
+    if (error?.code === 'LIMIT_FILE_SIZE' || req.file?.size > limit) {
+      return res.status(413).json({ success: false, message: sizeMessage });
+    }
+    if (error) return res.status(400).json({ success: false, message: 'Upload one file using the selected file field.' });
+    if (req.file && !extensions.includes(extname(req.file.originalname).toLowerCase())) {
+      return res.status(400).json({ success: false, message: typeMessage });
+    }
+    return next();
+  });
+};
+const manage = authorize('CEO', 'COO', 'Manager', 'HR');
+const view = authorize('CEO', 'COO', 'Manager', 'HR', 'Team Lead', 'CO Head');
+const importUpload = oneFile('file', 5 * 1024 ** 2, ['.xlsx', '.csv'],
+  'File size must be 5 MB or less.', 'Choose an .xlsx or .csv file.');
+const documentUpload = oneFile('document', 10 * 1024 ** 2, ['.pdf', '.jpg', '.jpeg', '.png', '.docx'],
+  'File size must be less than 10MB.', 'Choose a PDF, JPG, PNG or DOCX document.');
 
 router.use(protect);
 
-// Bulk import from Excel/CSV rows. Send { rows, dryRun, updateExisting }.
-router.post('/import', authorize('CEO', 'COO', 'Manager', 'HR'), importEmployees);
-router.get('/departments', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeDepartments);
-router.get('/stats', authorize('CEO', 'COO', 'Manager'), getEmployeeStats);
-router.get('/search', authorize('CEO', 'COO', 'Manager', 'Team Lead'), searchEmployees);
-router.get('/email/:email', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeByEmail);
-router.get('/employee-id/:employeeId', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeByEmployeeId);
-router.get('/department/:department', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeesByDepartment);
-router.get('/role/:role', authorize('CEO', 'COO', 'Manager'), getEmployeesByRole);
-router.get('/manager/:managerId', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeesByManager);
-router.post('/:id/documents', authorize('CEO', 'COO', 'Manager'), upload.single('document'), uploadEmployeeDocument);
+router.post('/import', manage, importUpload, importEmployees);
+router.get('/departments', view, getEmployeeDepartments);
+router.get('/stats', manage, getEmployeeStats);
+router.get('/search', view, searchEmployees);
+router.get('/email/:email', view, getEmployeeByEmail);
+router.get('/employee-id/:employeeId', view, getEmployeeByEmployeeId);
+router.get('/department/:department', view, getEmployeesByDepartment);
+router.get('/role/:role', manage, getEmployeesByRole);
+router.get('/manager/:managerId', view, getEmployeesByManager);
+router.post('/:id/documents', manage, documentUpload, uploadEmployeeDocument);
 router.get('/:id/leave-balance', getLeaveBalance);
-router.patch('/:id/leave-balance', authorize('CEO', 'COO', 'Manager'), updateLeaveBalance);
-router.get('/:id', authorize('CEO', 'COO', 'Manager', 'Team Lead'), getEmployeeById);
-router.put('/:id', authorize('CEO', 'COO', 'Manager'), updateEmployee);
-router.delete('/:id', authorize('CEO', 'COO', 'Team Lead', 'HR', 'Coordinator'), deleteEmployee);
-router.get('/', authorize('CEO', 'COO', 'Manager', 'Team Lead', 'HR', 'Coordinator'), getEmployees);
-router.post('/', authorize('CEO', 'COO', 'Manager'), createEmployee);
+router.patch('/:id/leave-balance', manage, updateLeaveBalance);
+router.get('/:id', view, getEmployeeById);
+router.put('/:id', manage, updateEmployee);
+router.delete('/:id', manage, deleteEmployee);
+router.get('/', view, getEmployees);
+router.post('/', manage, createEmployee);
 
 module.exports = router;

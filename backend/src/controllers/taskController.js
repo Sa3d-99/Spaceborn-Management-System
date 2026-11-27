@@ -1,4 +1,6 @@
 const Task = require('../models/Task');
+const { randomBytes } = require('node:crypto');
+const { query: queryDatabase } = require('../config/db');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 const { notifyTaskAssigned } = require('../utils/notificationDispatcher');
@@ -299,13 +301,12 @@ exports.getDailyLogsList = async (req, res) => {
   try {
     if (!req.user?.id) return res.status(401).json(formatResponse(false, 'Unauthorized'));
 
-    const tasks = await Task.find({
-      ...getAssignedUserQuery(req.user),
-      'logs.0': { $exists: true }
-    }).select('title logs');
+    const tasks = await Task.find(getAssignedUserQuery(req.user)).select('title logs assignedTo');
     const logs = tasks
-      .flatMap(task => (task.logs || []).map(log => ({
-        ...log.toObject(),
+      .filter(task => !task.assignedTo || [req.user.id, req.user.employeeId].includes(String(task.assignedTo)))
+      .flatMap(task => (Array.isArray(task.logs) ? task.logs : []).filter(log => log &&
+        (!log.userId || String(log.userId) === String(req.user.id))).map(log => ({
+        ...log,
         taskId: task._id,
         taskName: log.taskName || task.title,
       })))
@@ -324,48 +325,65 @@ exports.createDailyLogEntry = async (req, res) => {
     const userId = req.user?.id;
     if (!userId) return res.status(401).json(formatResponse(false, 'Unauthorized'));
 
-    const { taskId, taskName, progress, notes, content, date, hoursSpent } = req.body;
-    if (!taskId) return res.status(400).json(formatResponse(false, 'taskId is required'));
+    const { taskId, progress, notes, content, date, hoursSpent } = req.body || {};
+    if (typeof taskId !== 'string' || !taskId.trim()) return res.status(400).json(formatResponse(false, 'Select a task.'));
 
     const task = await Task.findOne({
       _id: taskId,
       ...getAssignedUserQuery(req.user)
     });
     if (!task) return res.status(404).json(formatResponse(false, 'Task not found'));
+    if (task.assignedTo && ![req.user.id, req.user.employeeId].includes(String(task.assignedTo))) {
+      return res.status(403).json(formatResponse(false, 'Only the assigned employee can log work on this task.'));
+    }
 
     const coercedProgress = progress === undefined || progress === null || progress === ''
       ? task.progress || 0
       : Number(progress);
 
-    if (Number.isNaN(coercedProgress) || coercedProgress < 0 || coercedProgress > 100) {
-      return res.status(400).json(formatResponse(false, 'progress must be a number between 0 and 100'));
+    if (!Number.isInteger(coercedProgress) || coercedProgress < 0 || coercedProgress > 100) {
+      return res.status(400).json(formatResponse(false, 'Progress must be a whole number from 0 to 100.'));
     }
 
+    const duration = Number(hoursSpent);
+    if ((typeof hoursSpent !== 'number' && typeof hoursSpent !== 'string') || !Number.isFinite(duration) || duration <= 0 || duration > 16) {
+      return res.status(400).json(formatResponse(false, 'Hours worked must be greater than 0 and at most 16.'));
+    }
+    const logDate = taskDueDate(date ?? businessDate());
+    if (!logDate || logDate > businessDate()) {
+      return res.status(400).json(formatResponse(false, 'Select a valid log date up to today in IST.'));
+    }
+    const description = notes ?? content ?? '';
+    if (typeof description !== 'string' || description.length > 2000) {
+      return res.status(400).json(formatResponse(false, 'Notes must be text up to 2,000 characters.'));
+    }
     const log = {
-      taskName: taskName || task.title,
+      id: randomBytes(12).toString('hex'),
+      taskName: task.title,
       progress: coercedProgress,
-      notes: notes || content || '',
-      content: content || notes || '',
-      date: date || new Date().toISOString(),
-      hoursSpent: hoursSpent === undefined || hoursSpent === null || hoursSpent === '' ? 0 : Number(hoursSpent),
+      notes: description,
+      content: description,
+      date: logDate,
+      hoursSpent: duration,
       userId,
       createdAt: new Date().toISOString(),
     };
 
-    if (Number.isNaN(log.hoursSpent) || log.hoursSpent < 0) {
-      return res.status(400).json(formatResponse(false, 'hoursSpent must be a positive number'));
-    }
-
-    task.logs.push(log);
-    task.progress = coercedProgress;
-    task.status = coercedProgress >= 100 ? 'Completed' : coercedProgress > 0 ? 'In progress' : 'Pending';
-    await task.save();
-
-    const createdLog = task.logs[task.logs.length - 1].toObject();
+    const status = coercedProgress === 100 ? 'Completed' : coercedProgress > 0 ? 'In progress' : 'Pending';
+    const updated = await queryDatabase(`
+      UPDATE tasks SET data = data || jsonb_build_object(
+        'logs', (CASE WHEN jsonb_typeof(data->'logs') = 'array' THEN data->'logs' ELSE '[]'::jsonb END)
+          || jsonb_build_array($2::jsonb),
+        'progress', $3::int, 'status', $4::text, 'updatedAt', NOW()
+      ), updated_at = NOW()
+      WHERE id = $1 AND data->>'assignedTo' IS NOT DISTINCT FROM $5::text
+        AND data->>'assignedToName' IS NOT DISTINCT FROM $6::text
+      RETURNING id
+    `, [task.id, JSON.stringify(log), coercedProgress, status, task.assignedTo ?? null, task.assignedToName ?? null]);
+    if (!updated.rows.length) return res.status(409).json(formatResponse(false, 'The task changed. Refresh it before logging work.'));
     return res.status(201).json(formatResponse(true, 'Daily log submitted successfully', {
-      ...createdLog,
-      taskId: task._id,
-      taskName: createdLog.taskName || task.title,
+      ...log,
+      taskId: task.id
     }));
   } catch (err) {
     return res.status(500).json(formatResponse(false, err.message));

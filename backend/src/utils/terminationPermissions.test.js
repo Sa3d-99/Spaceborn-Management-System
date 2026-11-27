@@ -11,14 +11,15 @@ test('CEO and Directors can terminate below their authority', () => {
   assert.equal(canTerminateUser({ role: 'CEO', id: 'ceo' }, { role: 'CEO', id: 'ceo' }), false);
 });
 
-test('HR and the department Team Lead can terminate an intern', () => {
+test('HR and Project Managers can terminate an intern', () => {
   assert.equal(canTerminateUser({ role: 'HR' }, member), true);
-  assert.equal(canTerminateUser({ role: 'Team Lead', department: member.department }, member), true);
+  assert.equal(canTerminateUser({ role: 'Manager' }, member), true);
+  assert.equal(canTerminateUser({ role: 'Manager' }, { role: 'COO' }), false);
   assert.equal(canTerminateUser({ role: 'Team Lead', department: 'Other' }, member), false);
 });
 
-test('project managers, interns and co-leads cannot terminate employees', () => {
-  for (const role of ['Manager', 'Member', 'CO Head', 'Co-Head']) {
+test('team leads, interns and co-leads cannot terminate employees', () => {
+  for (const role of ['Team Lead', 'Member', 'CO Head', 'Co-Head']) {
     assert.equal(canTerminateUser({ role, department: member.department }, member), false);
   }
   const legacyCoLead = { role: 'Team Lead', designation: 'Co-Lead', department: member.department };

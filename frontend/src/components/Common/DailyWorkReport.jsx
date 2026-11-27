@@ -51,8 +51,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
         });
       }
     } catch (error) {
-      console.error('Error fetching today\'s report:', error);
-      // Don't show error to user for missing report
+      setError(error.message);
     }
   };
 
@@ -61,17 +60,17 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
       const reports = await reportService.getUserReports(user.id);
       setPastReports(reports || []);
     } catch (error) {
-      console.error('Error fetching past reports:', error);
+      setError(error.message);
       setPastReports([]);
     }
   };
 
   const fetchCompliance = async () => {
     try {
-      const stats = await reportService.getComplianceReport(user.department);
+      const stats = await reportService.getComplianceReport();
       setCompliance(stats);
     } catch (error) {
-      console.error('Error fetching compliance:', error);
+      setError(error.message);
     }
   };
 
@@ -80,26 +79,19 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
     setIsSubmitting(true);
     setError('');
 
-    if (!formData.completedTasks.trim()) {
-      setError('Please fill in completed tasks');
+    if ([...formData.completedTasks.trim()].length < 10 || [...formData.nextDayPlan.trim()].length < 10) {
+      setError('Completed work and the next-day plan each need at least 10 characters.');
       setIsSubmitting(false);
       return;
     }
 
     try {
       const reportData = {
-        userId: user.id,
-        userName: user.name,
-        userRole: user.role,
-        department: user.department,
-        employeeId: user.employeeId,
         date: businessDate(),
         completedTasks: formData.completedTasks,
         ongoingWork: formData.ongoingWork,
         issuesFaced: formData.issuesFaced,
         nextDayPlan: formData.nextDayPlan,
-        submittedAt: new Date().toISOString(),
-        status: 'submitted',
       };
 
       const result = await reportService.submitReport(reportData);
@@ -306,6 +298,8 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
                 className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
                 placeholder="• Task 1: Completed feature X&#10;• Task 2: Fixed bug Y&#10;• Task 3: Attended meeting Z"
                 required
+                minLength={10}
+                maxLength={2000}
               />
               <p className="text-xs text-gray-400 mt-1">Use bullet points for better readability</p>
             </div>
@@ -316,6 +310,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
               </label>
               <textarea
                 value={formData.ongoingWork}
+                maxLength={2000}
                 onChange={(e) => setFormData({...formData, ongoingWork: e.target.value})}
                 rows="3"
                 className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
@@ -329,6 +324,7 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
               </label>
               <textarea
                 value={formData.issuesFaced}
+                maxLength={2000}
                 onChange={(e) => setFormData({...formData, issuesFaced: e.target.value})}
                 rows="3"
                 className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"
@@ -342,6 +338,9 @@ const DailyWorkReport = ({ user, onReportSubmitted }) => {
               </label>
               <textarea
                 value={formData.nextDayPlan}
+                required
+                minLength={10}
+                maxLength={2000}
                 onChange={(e) => setFormData({...formData, nextDayPlan: e.target.value})}
                 rows="3"
                 className="textarea w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-black focus:border-black"

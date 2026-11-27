@@ -1,4 +1,5 @@
 // controllers/attendanceController.js
+const { createHash } = require('node:crypto');
 const Attendance = require('../models/Attendance');
 const Meeting = require('../models/Meeting');
 const { businessDate, businessClock, businessInstant } = require('../utils/businessTime');
@@ -6,45 +7,33 @@ const Leave = require('../models/Leave');
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 
-// @desc    Auto-mark attendance on login
-// @route   POST /api/attendance/auto-mark
-// @access  Private
+async function markLoginAttendance(user, now = new Date()) {
+  const { id: userId, employeeId, department, role } = user;
+  const today = businessDate(now);
+  const dayAttendance = await Attendance.findOne({ userId: String(userId), date: today });
+  if (dayAttendance) return { attendance: dayAttendance, created: false };
+
+  const meetings = await Meeting.find({
+    date: today,
+    department: { $in: [department, 'All'] },
+    status: { $nin: ['cancelled', 'canceled'] }
+  });
+  const starts = meetings.map(meeting => businessInstant(meeting.date, meeting.time).getTime()).filter(Number.isFinite);
+  const late = starts.length > 0 && now.getTime() > Math.min(...starts) + 5 * 60_000;
+  const id = createHash('sha256').update(JSON.stringify([userId, today])).digest('hex').slice(0, 24);
+  const attendance = await Attendance.create({
+    _id: id, userId: String(userId), userName: user.name || user.fullName, employeeId, department, role,
+    date: today, checkIn: businessClock(now), checkInTime: now, status: late ? 'late' : 'present', isAutoMarked: true
+  });
+  return { attendance, created: true };
+}
+
+exports.markLoginAttendance = markLoginAttendance;
+
 exports.autoMarkAttendance = async (req, res) => {
-  try {
-    const { id: userId, name: userName, employeeId, department, role } = req.user;
-    const now = new Date();
-    const today = businessDate(now);
-    const dayAttendance = await Attendance.findOne({ userId: String(userId), date: today });
-    if (dayAttendance) return res.status(200).json(formatResponse(true, 'Attendance already marked', dayAttendance));
-
-    const meetings = await Meeting.find({
-      date: today,
-      department: { $in: [department, 'All'] },
-      status: { $nin: ['cancelled', 'canceled'] }
-    });
-    const starts = meetings.map(meeting => businessInstant(meeting.date, meeting.time).getTime()).filter(Number.isFinite);
-    const late = starts.length > 0 && now.getTime() > Math.min(...starts) + 5 * 60_000;
-    const currentTime = businessClock(now);
-    const status = late ? 'late' : 'present';
-
-    const attendance = await Attendance.create({
-      userId: String(userId),
-      userName,
-      employeeId,
-      department,
-      role,
-      date: today,
-      checkIn: currentTime,
-      checkInTime: now,
-      status,
-      isAutoMarked: true
-    });
-    
-    res.status(201).json(formatResponse(true, 'Attendance marked on login', attendance));
-  } catch (error) {
-    console.error('Auto-mark attendance error:', error);
-    res.status(500).json(formatResponse(false, error.message));
-  }
+  const { attendance, created } = await markLoginAttendance(req.user);
+  return res.status(created ? 201 : 200).json(formatResponse(true,
+    created ? 'Attendance marked on login' : 'Attendance already marked', attendance));
 };
 
 exports.clockOut = async (req, res) => {
@@ -280,14 +269,16 @@ exports.getRosterAttendance = async (req, res) => {
     const viewRole = user?.role;
 
     // Scope:
-    // - CEO/Manager: all departments unless a department filter is passed
-    // - Other roles: their own department
-    const hasCompanyAttendanceAccess = ['CEO', 'COO', 'Manager'].includes(viewRole);
+    // Management and HR can filter the whole roster; leads see their own department.
+    const hasCompanyAttendanceAccess = ['CEO', 'COO', 'Manager', 'HR', 'Coordinator'].includes(viewRole);
     const scopeDepartment = hasCompanyAttendanceAccess
       ? (department && department !== 'all' ? department : null)
       : user?.department;
 
-    const usersQuery = { role: { $in: ['CEO', 'COO', 'Manager', 'Co-Head', 'CO Head', 'Team Lead', 'Member', 'HR'] } };
+    if (!hasCompanyAttendanceAccess && !scopeDepartment) {
+      return res.status(403).json(formatResponse(false, 'An assigned department is required to view attendance.'));
+    }
+    const usersQuery = { role: { $in: ['CEO', 'COO', 'Manager', 'Co-Head', 'CO Head', 'Team Lead', 'Member', 'HR', 'Coordinator'] } };
     if (scopeDepartment) usersQuery.department = scopeDepartment;
 
     const employees = await User.find({ ...usersQuery, isActive: { $ne: false } }).select('employeeId firstName lastName fullName role department');

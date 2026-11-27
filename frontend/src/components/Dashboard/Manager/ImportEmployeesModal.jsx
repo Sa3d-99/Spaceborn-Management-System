@@ -1,5 +1,4 @@
 // src/components/Dashboard/Manager/ImportEmployeesModal.jsx
-// Upload an Excel/CSV of employees -> preview what will happen -> import -> download login credentials.
 import React, { useState } from 'react';
 import * as XLSX from 'xlsx';
 import employeeService from '../../../services/employeeService';
@@ -16,91 +15,64 @@ const TEMPLATE_EXAMPLE = [
   'Core Systems & Kernel', 'Kernel', 'Cedric Compaore', '15/07/2025', '02/03/2001', 'Male', 'B+', 'Remote', 'Active'
 ];
 
-// Header row = first row (within the first 10) with at least two filled cells, so title rows are skipped.
-function readWorkbook(arrayBuffer, sheetName) {
-  // Keep dates as Excel serial numbers; the server converts them exactly (Date objects can shift a day across time zones).
-  const wb = XLSX.read(arrayBuffer, { type: 'array', cellDates: false });
-  const name = sheetName && wb.SheetNames.includes(sheetName) ? sheetName : wb.SheetNames[0];
-  const ws = wb.Sheets[name];
-  const grid = XLSX.utils.sheet_to_json(ws, { header: 1, raw: true, defval: '', blankrows: true });
-  let headerIdx = grid.findIndex((r, i) => i < 10 && r.filter((c) => String(c).trim() !== '').length >= 2);
-  if (headerIdx < 0) headerIdx = 0;
-  const headers = (grid[headerIdx] || []).map((h) => String(h).trim());
-  const rows = [];
-  for (let i = headerIdx + 1; i < grid.length; i++) {
-    const line = grid[i];
-    if (!line || line.every((c) => String(c).trim() === '')) continue;
-    const obj = { __row__: i + 1 };
-    headers.forEach((h, col) => {
-      if (!h) return;
-      obj[h] = line[col];
-    });
-    rows.push(obj);
-  }
-  return { rows, sheetNames: wb.SheetNames, sheet: name };
-}
-
 const Pill = ({ color, children }) => (
   <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${color}`}>{children}</span>
 );
 
 const ImportEmployeesModal = ({ onClose, onImported }) => {
   const [file, setFile] = useState(null);
-  const [rows, setRows] = useState([]);
   const [sheetNames, setSheetNames] = useState([]);
   const [sheet, setSheet] = useState('');
-  const [buffer, setBuffer] = useState(null);
   const [updateExisting, setUpdateExisting] = useState(false);
   const [preview, setPreview] = useState(null);
   const [result, setResult] = useState(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
 
-  const runPreview = async (parsedRows, update = updateExisting) => {
-    setBusy(true); setError(''); setPreview(null);
+  const runPreview = async (selectedFile, selectedSheet, update = updateExisting) => {
+    setBusy(true);
+    setError('');
+    setPreview(null);
     try {
-      setPreview(await employeeService.importEmployees(parsedRows, { dryRun: true, updateExisting: update }));
-    } catch (e) {
-      setError(e.message);
+      const data = await employeeService.importEmployees(selectedFile, { sheet: selectedSheet, updateExisting: update });
+      setPreview(data);
+      setSheetNames(data.sheetNames || []);
+      setSheet(data.sheet || '');
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
   };
 
-  const loadSheet = (buf, name) => {
-    const parsed = readWorkbook(buf, name);
-    setRows(parsed.rows);
-    setSheetNames(parsed.sheetNames);
-    setSheet(parsed.sheet);
-    if (parsed.rows.length === 0) {
-      setError('No employee rows found in this sheet.');
-      setPreview(null);
+  const handleFile = async event => {
+    const selectedFile = event.target.files?.[0];
+    if (!selectedFile) return;
+    setFile(null);
+    setPreview(null);
+    setSheetNames([]);
+    setResult(null);
+    if (!/\.(xlsx|csv)$/i.test(selectedFile.name)) {
+      setError('Choose an .xlsx or .csv file.');
       return;
     }
-    runPreview(parsed.rows);
-  };
-
-  const handleFile = async (e) => {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    setFile(f); setResult(null); setError('');
-    try {
-      const buf = await f.arrayBuffer();
-      setBuffer(buf);
-      loadSheet(buf);
-    } catch (err) {
-      setError(`Could not read file: ${err.message}`);
+    if (selectedFile.size > 5 * 1024 ** 2) {
+      setError('File size must be 5 MB or less.');
+      return;
     }
+    setFile(selectedFile);
+    await runPreview(selectedFile);
   };
 
   const handleImport = async () => {
-    setBusy(true); setError('');
+    setBusy(true);
+    setError('');
     try {
-      const res = await employeeService.importEmployees(rows, { dryRun: false, updateExisting });
-      setResult(res);
-      onImported && onImported(res);
-    } catch (e) {
-      setError(e.message);
+      const data = await employeeService.importEmployees(file, { sheet, dryRun: false, updateExisting });
+      setResult(data);
+      onImported?.(data);
+    } catch (err) {
+      setError(err.message);
     } finally {
       setBusy(false);
     }
@@ -114,27 +86,18 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
     XLSX.writeFile(wb, 'spaceborn_employee_import_template.xlsx');
   };
 
-  const downloadCredentials = () => {
-    const ws = XLSX.utils.json_to_sheet(result.credentials.map((c) => ({
-      'Employee ID': c.employeeId, Name: c.name, Email: c.email, 'Temporary Password': c.password
-    })));
-    const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Credentials');
-    XLSX.writeFile(wb, `employee_credentials_${new Date().toISOString().slice(0, 10)}.xlsx`);
-  };
-
   const view = result || preview;
   const s = view?.summary;
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+    <div role="dialog" aria-modal="true" aria-labelledby="employee-import-title" className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-5xl max-h-[90vh] flex flex-col">
         <div className="flex items-center justify-between px-6 py-4 border-b">
           <div>
-            <h2 className="text-lg font-semibold text-gray-900">Import employees from Excel</h2>
+            <h2 id="employee-import-title" className="text-lg font-semibold text-gray-900">Import employees from Excel</h2>
             <p className="text-sm text-gray-500">Upload .xlsx or .csv. You'll see a preview before anything is saved.</p>
           </div>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
+          <button aria-label="Close import" onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl leading-none">&times;</button>
         </div>
 
         <div className="px-6 py-4 overflow-y-auto flex-1 space-y-4">
@@ -142,11 +105,11 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
             <div className="flex flex-wrap items-center gap-3">
               <label className="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 cursor-pointer">
                 {file ? 'Choose another file' : 'Choose file'}
-                <input type="file" accept=".xlsx,.xls,.csv" className="file-input hidden" onChange={handleFile} />
+                <input type="file" accept=".xlsx,.csv" disabled={busy} className="file-input hidden" onChange={handleFile} />
               </label>
-              {file && <span className="text-sm text-gray-700">{file.name} · {rows.length} rows</span>}
+              {file && <span className="text-sm text-gray-700">{file.name}</span>}
               {sheetNames.length > 1 && (
-                <select value={sheet} onChange={(e) => loadSheet(buffer, e.target.value)}
+                <select aria-label="Worksheet" value={sheet} disabled={busy} onChange={e => runPreview(file, e.target.value)}
                   className="select px-3 py-2 border border-gray-300 rounded-lg text-sm">
                   {sheetNames.map((n) => <option key={n} value={n}>{n}</option>)}
                 </select>
@@ -166,7 +129,7 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
             </div>
           )}
 
-          {error && <div className="p-3 rounded-lg bg-red-50 text-red-700 text-sm">{error}</div>}
+          {error && <div role="alert" className="alert alert-error">{error}</div>}
           {busy && <div className="text-sm text-gray-500">Working…</div>}
 
           {view && (
@@ -245,16 +208,15 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
                 </div>
               )}
 
-              {result && result.credentials.length > 0 && (
-                <div className="p-4 rounded-lg bg-purple-50 text-sm text-purple-900 flex flex-wrap items-center gap-3">
-                  <span>
-                    {result.credentials.length} new employees have temporary passwords. Download them now — they can't be shown again.
-                  </span>
-                  <button onClick={downloadCredentials} className="btn btn-sm btn-ghost px-3 py-1.5 bg-purple-600 text-white rounded-lg hover:bg-purple-700">
-                    Download login credentials
-                  </button>
-                </div>
-              )}
+              {result && result.created.length > 0 && <p className="alert alert-info" role="status">
+                Password setup emails queued for {result.created.length} new employees.
+              </p>}
+              {view.managerWarnings?.length > 0 && <details className="text-sm">
+                <summary className="cursor-pointer">Reporting manager warnings</summary>
+                <ul className="mt-2">{view.managerWarnings.map(warning => <li key={warning.row}>
+                  Row {warning.row} · {warning.manager} · {warning.warning}
+                </li>)}</ul>
+              </details>}
             </>
           )}
         </div>
@@ -262,8 +224,8 @@ const ImportEmployeesModal = ({ onClose, onImported }) => {
         <div className="px-6 py-4 border-t flex flex-wrap items-center justify-between gap-3">
           {!result ? (
             <label className="flex items-center gap-2 text-sm text-gray-700">
-              <input type="checkbox" checked={updateExisting} disabled={!rows.length || busy}
-                onChange={(e) => { setUpdateExisting(e.target.checked); runPreview(rows, e.target.checked); }} />
+              <input type="checkbox" checked={updateExisting} disabled={!file || busy}
+                onChange={(e) => { setUpdateExisting(e.target.checked); runPreview(file, sheet, e.target.checked); }} />
               Update employees that already exist (matched by Employee ID or email)
             </label>
           ) : <span />}

@@ -3,10 +3,14 @@ import { displayDate } from '../../../utils/timeZone';
 // src/components/Dashboard/Lead/MVPRoadmap.jsx
 import React, { useState, useEffect, useRef } from 'react';
 import roadmapService from '../../../services/roadmapService';
+import authService from '../../../services/authService';
+
+const apiBase = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 
 const MVPRoadmap = ({ userRole = 'Lead' }) => {
   const [roadmaps, setRoadmaps] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [loadError, setLoadError] = useState('');
   const [showForm, setShowForm] = useState(false);
   const [showShareModal, setShowShareModal] = useState(false);
   const [showProgressModal, setShowProgressModal] = useState(false);
@@ -54,68 +58,17 @@ const MVPRoadmap = ({ userRole = 'Lead' }) => {
 
   const fetchRoadmaps = async () => {
     setIsLoading(true);
+    setLoadError('');
     try {
-      const data = await roadmapService.getAllRoadmaps();
-      if (data.length > 0) {
-        setRoadmaps(data);
-      } else if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        loadMockData();
-      }
-    } catch (error) {
-      console.error('Error fetching roadmaps:', error);
-      if (process.env.REACT_APP_USE_MOCK_AUTH === 'true') {
-        loadMockData();
-      }
+      const response = await fetch(`${apiBase}/roadmaps`, { headers: authService.getAuthHeaders() });
+      const body = await response.json();
+      if (!response.ok || !Array.isArray(body.data)) throw new Error('Could not load roadmaps.');
+      setRoadmaps(body.data);
+    } catch {
+      setLoadError('Could not load roadmaps. Try again.');
     } finally {
       setIsLoading(false);
     }
-  };
-
-  const loadMockData = () => {
-    const mockRoadmaps = [
-      {
-        id: 1,
-        title: 'SpaceBorn CMS MVP Roadmap',
-        version: '2.1',
-        description: 'Complete roadmap for SpaceBorn CMS MVP development including core features, milestones, and delivery timeline.',
-        startDate: '2026-01-15',
-        targetDate: '2026-12-20',
-        lastUpdated: '2026-06-10T10:00:00Z',
-        status: 'active',
-        sharedWith: ['CEO', 'COO', 'Manager'],
-        sharedAt: '2026-06-10T10:00:00Z',
-        overallProgress: 45,
-        progressHistory: [
-          { date: '2026-06-01', progress: 40, notes: 'Completed authentication module' },
-          { date: '2026-06-08', progress: 45, notes: 'Dashboard UI improvements' }
-        ],
-        milestones: [
-          { id: 1, title: 'Phase 1: Foundation', dueDate: '2026-03-15', status: 'completed', description: 'Basic setup and architecture', progress: 100 },
-          { id: 2, title: 'Phase 2: Core Features', dueDate: '2026-06-30', status: 'in-progress', description: 'Authentication, Dashboard, Content Management', progress: 65 },
-          { id: 3, title: 'Phase 3: Advanced Features', dueDate: '2026-09-30', status: 'planned', description: 'Analytics, AI Insights, Collaboration', progress: 20 },
-          { id: 4, title: 'Phase 4: Polish & Launch', dueDate: '2026-12-20', status: 'planned', description: 'Testing, Optimization, Deployment', progress: 0 }
-        ],
-        features: [
-          { id: 1, name: 'User Authentication', priority: 'high', status: 'completed' },
-          { id: 2, name: 'Dashboard UI', priority: 'high', status: 'completed' },
-          { id: 3, name: 'Content Management System', priority: 'high', status: 'in-progress' },
-          { id: 4, name: 'AI-Powered Insights', priority: 'medium', status: 'planned' },
-          { id: 5, name: 'Real-time Collaboration', priority: 'medium', status: 'planned' }
-        ],
-        risks: [
-          { id: 1, description: 'Third-party API dependency', impact: 'high', mitigation: 'Have fallback and caching strategy', status: 'monitoring' },
-          { id: 2, description: 'Resource constraints', impact: 'medium', mitigation: 'Cross-training team members', status: 'mitigated' }
-        ],
-        attachments: [
-          { id: 1, name: 'MVP_Requirements.pdf', url: '/files/mvp-requirements.pdf', size: '2.4 MB', type: 'application/pdf' }
-        ],
-        blockers: ['API documentation delay', 'Hardware & Integration resources unavailable'],
-        createdBy: 'Priya Sharma',
-        createdAt: '2026-01-10T09:00:00Z'
-      }
-    ];
-    setRoadmaps(mockRoadmaps);
-    setIsLoading(false);
   };
 
   const handleFileUpload = async (event) => {
@@ -384,7 +337,7 @@ const MVPRoadmap = ({ userRole = 'Lead' }) => {
         r.id === sharingRoadmap.id ? sharedRoadmap : r
       ));
       setShowShareModal(false);
-      showToastMessage('MVP roadmap issued to Manager, CEO, and COO', 'success');
+      showToastMessage('MVP roadmap shared with leadership', 'success');
     } catch (error) {
       showToastMessage(error.message || 'Failed to issue roadmap', 'error');
     }
@@ -462,6 +415,12 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
     if (typeof attachment.size === 'number') return `${(attachment.size / (1024 * 1024)).toFixed(2)} MB`;
     return attachment.size || 'Unknown size';
   };
+
+  if (loadError) {
+    return <div role="alert" className="alert alert-error">{loadError}
+      <button type="button" className="btn btn-sm" onClick={fetchRoadmaps}>Try again</button>
+    </div>;
+  }
 
   if (isLoading) {
     return (
@@ -1046,7 +1005,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
               </div>
               
               <p className="text-gray-600 mb-4">
-                Issue "{sharingRoadmap.title}" to Manager, CEO, and COO?
+                Share "{sharingRoadmap.title}" with the CEO, Directors, and Project Managers?
               </p>
               
               <div className="bg-purple-50 rounded-lg p-4 mb-6">
@@ -1055,7 +1014,7 @@ ${roadmap.attachments?.map(a => `- ${a.name} (${formatAttachmentSize(a)})`).join
                     <IconUsers className="w-4 h-4 text-white" />
                   </div>
                   <div>
-                    <p className="font-medium text-gray-900">Manager, CEO & COO</p>
+                    <p className="font-medium text-gray-900">CEO, Directors and Project Managers</p>
                     <p className="text-xs text-gray-500">They will receive view-only access to this issued MVP roadmap</p>
                   </div>
                 </div>

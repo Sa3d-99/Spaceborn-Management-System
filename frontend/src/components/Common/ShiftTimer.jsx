@@ -1,59 +1,76 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Clock3, Menu, Settings2 } from './Icons';
+import { useEffect, useState } from 'react';
+import { Clock3, Menu } from './Icons';
 import authService from '../../services/authService';
-import { BUSINESS_TIME_ZONE, displayDate, displayTime } from '../../utils/timeZone';
+import { businessDate, displayDate, displayTime } from '../../utils/timeZone';
 
-const timeZones = [...new Set([BUSINESS_TIME_ZONE, 'UTC', ...(Intl.supportedValuesOf?.('timeZone') || [])])];
 const apiBase = (process.env.REACT_APP_API_URL || '/api').replace(/\/+$/, '');
 
-export default function ShiftTimer({ user, onLogout, onTimeZoneChange, navigationOpen, onToggleNavigation }) {
+function workingTime(attendance, now) {
+  const start = Date.parse(attendance?.checkInTime);
+  if (!Number.isFinite(start)) return '0h 00m';
+  const end = Date.parse(attendance.checkOutTime) || (attendance.checkOut ? NaN : now.getTime());
+  const minutes = Number.isFinite(end) ? Math.floor((end - start) / 60_000) : (Number(attendance.hoursWorked) || 0) * 60;
+  const total = Math.max(0, Math.round(minutes));
+  return `${Math.floor(total / 60)}h ${String(total % 60).padStart(2, '0')}m`;
+}
+
+export default function ShiftTimer({ user, onLogout, navigationOpen, onToggleNavigation }) {
   const [now, setNow] = useState(() => new Date());
-  const [timeZone, setTimeZone] = useState(user.timeZone || BUSINESS_TIME_ZONE);
+  const [attendance, setAttendance] = useState(null);
   const [error, setError] = useState('');
-  const [saving, setSaving] = useState(false);
-  const dialog = useRef(null);
+  const [pending, setPending] = useState(false);
+  const [online, setOnline] = useState(() => navigator.onLine);
+  const date = businessDate(now);
 
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
   }, []);
 
-  async function save(event) {
-    event.preventDefault();
-    setError('');
-    setSaving(true);
-    try {
-      const response = await fetch(`${apiBase}/auth/preferences`, {
-        method: 'PATCH',
-        headers: authService.getAuthHeaders(),
-        body: JSON.stringify({ timeZone })
-      });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.message || 'Could not save your time zone.');
-      onTimeZoneChange(data.data.timeZone);
-      dialog.current.close();
-    } catch (err) {
-      setError(err.message);
-    } finally {
-      setSaving(false);
-    }
-  }
+  useEffect(() => {
+    const update = () => setOnline(navigator.onLine);
+    window.addEventListener('online', update);
+    window.addEventListener('offline', update);
+    return () => {
+      window.removeEventListener('online', update);
+      window.removeEventListener('offline', update);
+    };
+  }, []);
 
-  async function clockOut() {
+  useEffect(() => {
+    const controller = new AbortController();
+    fetch(`${apiBase}/dashboard/my-attendance`, { headers: authService.getAuthHeaders(), signal: controller.signal })
+      .then(async response => {
+        if (!response.ok) throw new Error('Could not load today’s attendance.');
+        const body = await response.json();
+        if (!controller.signal.aborted) setAttendance(body.data || null);
+      })
+      .catch(error => {
+        if (!controller.signal.aborted) setError(error.message);
+      });
+    return () => controller.abort();
+  }, [user.id, date]);
+
+  async function attendanceAction(action, message) {
     setError('');
+    setPending(true);
     try {
-      const response = await fetch(`${apiBase}/attendance/clock-out`, {
+      const response = await fetch(`${apiBase}/attendance/${action}`, {
         method: 'POST', headers: authService.getAuthHeaders()
       });
-      if (!response.ok) throw new Error('Could not check out. Try again.');
-      await onLogout();
+      const body = await response.json();
+      if (!response.ok || body.success === false) throw new Error(body.message || message);
+      if (action === 'clock-out') await onLogout();
+      else setAttendance(body.data);
     } catch (err) {
-      setError(err.message);
+      setError(err.message || message);
+    } finally {
+      setPending(false);
     }
   }
 
   return (
-    <header className="navbar sticky top-0 z-50 min-h-[73px] flex-wrap justify-between gap-2 border-b border-base-300 bg-base-100 px-4 shadow-sm">
+    <header className="navbar z-50 min-h-[73px] shrink-0 flex-wrap justify-between gap-2 border-b border-base-300 bg-base-100 px-4 shadow-sm">
       <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-sm">
         <button className="btn btn-ghost btn-square btn-sm md:hidden" type="button"
           onClick={onToggleNavigation} aria-expanded={navigationOpen} aria-label="Dashboard menu">
@@ -65,35 +82,21 @@ export default function ShiftTimer({ user, onLogout, onTimeZoneChange, navigatio
             {displayTime(now, 'en-IN', { hour: '2-digit', minute: '2-digit', second: '2-digit', timeZoneName: 'short' })}
           </time>
         </span>
-        <span className="hidden text-base-content/70 sm:inline">{displayDate(now)}</span>
-        <span className="hidden text-base-content/70 md:inline">Shift 8 AM–midnight IST</span>
+        <span className="text-base-content/70">{displayDate(now)}</span>
+        <span className="text-base-content/70">Shift 8 AM–midnight IST</span>
+        <span className="flex items-center gap-1">
+          <span aria-hidden="true" className={`size-2 rounded-full ${online ? 'bg-success' : 'bg-error'}`} />
+          {online ? 'Online' : 'Offline'}
+        </span>
+        <span className="tabular-nums">Active Working Hours: {workingTime(attendance, now)}</span>
       </div>
-      <div className="flex gap-2">
-        <button className="btn btn-ghost btn-sm" type="button" onClick={() => { setError(''); dialog.current.showModal(); }}>
-          <Settings2 size={16} aria-hidden="true" /> Time zone
-        </button>
-        <button className="btn btn-outline btn-sm" type="button" onClick={clockOut}>Check out and sign out</button>
+      <div className="flex flex-wrap gap-2">
+        <button className="btn btn-neutral btn-sm" type="button" disabled={!online || pending || Boolean(attendance?.checkInTime)}
+          onClick={() => attendanceAction('auto-mark', 'Could not mark attendance. Try again.')}>Mark Attendance</button>
+        <button className="btn btn-outline btn-sm" type="button" disabled={!online || pending}
+          onClick={() => attendanceAction('clock-out', 'Could not check out. Try again.')}>Check out and sign out</button>
       </div>
-      {error && !dialog.current?.open && <p className="alert alert-error w-full py-2" role="alert">{error}</p>}
-      <dialog className="modal" ref={dialog} aria-labelledby="time-zone-title">
-        <div className="modal-box">
-          <h2 id="time-zone-title" className="text-lg font-semibold">Display time zone</h2>
-          <p className="mt-2 text-sm text-base-content/70">Company attendance and meeting schedules use India time.</p>
-          {error && <p className="alert alert-error mt-3" role="alert">{error}</p>}
-          <form onSubmit={save}>
-            <label className="mt-4 grid gap-1">
-              <span className="label">Time zone</span>
-              <select className="select w-full" value={timeZone} onChange={event => setTimeZone(event.target.value)}>
-                {timeZones.map(zone => <option key={zone}>{zone}</option>)}
-              </select>
-            </label>
-            <div className="modal-action">
-              <button type="button" className="btn btn-ghost" onClick={() => { setError(''); dialog.current.close(); }}>Cancel</button>
-              <button type="submit" className="btn btn-neutral" disabled={saving}>Save time zone</button>
-            </div>
-          </form>
-        </div>
-      </dialog>
+      {error && <p className="alert alert-error w-full py-2" role="alert">{error}</p>}
     </header>
   );
 }

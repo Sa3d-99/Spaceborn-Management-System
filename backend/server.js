@@ -10,6 +10,7 @@ if (require.main === module) {
 
   connectDB()
     .then(() => {
+      require('./src/services/employeeSetupEmailService').startEmployeeSetupEmailWorker();
       app.listen(PORT, () => {
         const { APP_URL } = process.env;
         const address = URL.canParse(APP_URL) ? new URL(APP_URL).origin : `http://localhost:${PORT}`;

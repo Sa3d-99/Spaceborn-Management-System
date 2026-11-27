@@ -1,11 +1,13 @@
-const { canTerminateUser, canAssignEmployeeRole } = require('../utils/terminationPermissions');
-// Bulk employee import: turns spreadsheet rows into users.
-// Used by the API (POST /api/employees/import) and the CLI (scripts/importEmployees.js).
-const { passwordError, generatePassword } = require('../utils/passwords');
-const User = require('../models/User');
-const { normalizeDepartment: officialDepartment } = require('../config/departments');
+const { randomUUID } = require('node:crypto');
+const { query } = require('../config/db');
+const { canTerminateUser, canAssignEmployeeRole, canChangeEmployeeRole, effectiveRole } = require('../utils/terminationPermissions');
+const { validateEmployeeFields } = require('../utils/employeeFields');
+const { DEPARTMENTS, normalizeDepartment } = require('../config/departments');
+const {
+  allocateEmployeeIds, withEmployeeIdentityLock, newEmployee, insertEmployees, updateEmployees
+} = require('./employeeDirectoryService');
 
-
+const roleLabel = role => ({ COO: 'Director', Manager: 'Project Manager', 'CO Head': 'Co-Lead', Member: 'Intern' })[role] || role;
 const VALID_ROLES = ['CEO', 'COO', 'Manager', 'Team Lead', 'CO Head', 'HR', 'Member'];
 
 // Spreadsheet header (lowercased, punctuation stripped) -> user field.
@@ -14,7 +16,7 @@ const HEADER_ALIASES = {
   name: ['name', 'full name', 'employee name', 'emp name', 'fullname'],
   firstName: ['first name', 'firstname', 'given name'],
   lastName: ['last name', 'lastname', 'surname', 'family name'],
-  email: ['email', 'email id', 'email address', 'mail', 'mail id', 'official email', 'official email id', 'work email', 'company email'],
+  email: ['email', 'email id', 'email address', 'e mail', 'e mail id', 'e mail address', 'mail', 'mail id', 'official email', 'official email id', 'work email', 'company email'],
   personalEmail: ['personal email', 'personal email id', 'personal mail'],
   phone: ['phone', 'phone no', 'phone number', 'mobile', 'mobile no', 'mobile number', 'contact', 'contact no', 'contact number', 'whatsapp', 'whatsapp no'],
   role: ['role', 'access role', 'system role', 'access level'],
@@ -40,7 +42,7 @@ const HEADER_ALIASES = {
 const ALIAS_LOOKUP = Object.entries(HEADER_ALIASES).reduce((acc, [field, aliases]) => {
   aliases.forEach((alias) => { acc[alias] = field; });
   return acc;
-}, {});
+}, Object.create(null));
 
 const normalizeHeader = (h) => String(h || '')
   .toLowerCase()
@@ -57,7 +59,7 @@ const clean = (v) => {
 };
 
 function mapHeaders(headers) {
-  const mapping = {};
+  const mapping = Object.create(null);
   const unmapped = [];
   headers.forEach((h) => {
     const field = ALIAS_LOOKUP[normalizeHeader(h)];
@@ -67,30 +69,16 @@ function mapHeaders(headers) {
   return { mapping, unmapped };
 }
 
-function normalizeRole(raw, designation) {
-  const r = normalizeHeader(raw || '');
-  const d = normalizeHeader(designation || '');
-  if (/\bco\s*(lead|head)\b/.test(r || d)) return 'CO Head';
-  if (!r) {
-    if (/\bchief executive\b|^ceo$/.test(d)) return 'CEO';
-    if (/\bchief operating\b|^coo$/.test(d)) return 'COO';
-    if (/\bteam lead\b|\btech lead\b/.test(d)) return 'Team Lead';
-    // Job titles like "Product Manager" or "HR Executive" don't imply system access;
-    // add a Role column to grant Manager/HR rights explicitly.
-    return 'Member';
-  }
-  // Spaceborn titles -> internal permission codes (see frontend/src/utils/roleLabels.js):
-  //   CEO -> CEO, Director -> COO, Team Lead -> Team Lead, Co-Lead -> CO Head, Project Manager -> Manager, Intern -> Member
-  if (r === 'ceo' || r.includes('chief executive') || r.includes('founder & ceo') || r === 'founder') return 'CEO';
-  if (r === 'coo' || r.includes('chief operating') || r.includes('director')) return 'COO';
-  if (r.includes('project manager') || r === 'pm' || r === 'manager') return 'Manager';
-  if (r.includes('team lead') || r === 'lead' || r === 'tl' || r.includes('tech lead')) return 'Team Lead';
-  if (r === 'hr' || r === 'coordinator' || r.includes('human resource')) return 'HR';
-  return 'Member'; // employee, intern, engineer, member, etc.
-}
-
-function normalizeDepartment(raw) {
-  return officialDepartment(clean(raw)) || '';
+function normalizeRole(raw) {
+  const role = normalizeHeader(raw);
+  if (!role || ['member', 'intern', 'employee', 'engineer'].includes(role)) return 'Member';
+  if (/\bco\s*(lead|head)\b/.test(role)) return 'CO Head';
+  if (role === 'ceo' || role.includes('chief executive') || role === 'founder') return 'CEO';
+  if (role === 'coo' || role.includes('chief operating') || role === 'director') return 'COO';
+  if (['project manager', 'pm', 'manager'].includes(role)) return 'Manager';
+  if (['team lead', 'lead', 'tl', 'tech lead'].includes(role)) return 'Team Lead';
+  if (['hr', 'coordinator'].includes(role) || role.includes('human resource')) return 'HR';
+  return raw;
 }
 
 // Accepts JS Date, Excel serial numbers, YYYY-MM-DD, DD/MM/YYYY, DD-MM-YYYY, "12 Jan 2024".
@@ -117,7 +105,7 @@ function parseDate(raw) {
     const year = m[3].length === 2 ? `20${m[3]}` : m[3];
     // Indian convention is day first; fall back to month first (e.g. 11-16-2026) when that's the only valid reading.
     if (valid(year, m[2], m[1])) return iso(year, m[2], m[1]);
-    if (valid(year, m[1], m[2])) return iso(year, m[1], m[2]);
+    if (Number(m[2]) > 12 && valid(year, m[1], m[2])) return iso(year, m[1], m[2]);
     return null;
   }
   const parsed = new Date(s);
@@ -142,40 +130,32 @@ function isActiveStatus(raw) {
   return !['inactive', 'terminated', 'resigned', 'left', 'exited', 'no', 'false', '0', 'relieved'].includes(s);
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-const rolePrefix = (role) => (
-  role === 'CEO' ? 'CEO' :
-  role === 'COO' ? 'DIR' :        // Director
-  role === 'Manager' ? 'PM' :     // Project Manager
-  role === 'Team Lead' ? 'LD' :
-  role === 'CO Head' ? 'COH' :
-  role === 'HR' ? 'HR' : 'INT'
-);
-
-// Command-line imports run outside the web role boundary.
-const canAssignRole = (actorRole, targetRole) => !actorRole || canAssignEmployeeRole(actorRole, targetRole);
-
 /**
  * Convert raw spreadsheet rows (array of {header: value}) into validated employee records.
  * Returns { records, errors, mapping, unmapped } without touching the database.
  */
 function parseRows(rows) {
-  const headers = [...new Set(rows.flatMap((r) => Object.keys(r)))].filter((h) => h !== '__row__');
+  const headers = [...new Set(rows.flatMap(row => row && typeof row === 'object' ? Object.keys(row) : []))]
+    .filter(header => header !== '__row__');
   const { mapping, unmapped } = mapHeaders(headers);
   const records = [];
   const errors = [];
   let totalRows = 0;
 
   rows.forEach((row, idx) => {
-    const rowNumber = Number(row.__row__) || idx + 2; // __row__ = real sheet row; else assume header on row 1
+    const rowNumber = Number(row?.__row__) || idx + 2;
+    if (!row || typeof row !== 'object' || Array.isArray(row)) {
+      errors.push({ row: rowNumber, errors: ['Invalid employee row'] });
+      totalRows += 1;
+      return;
+    }
     const rec = {};
-    const extra = {};
+    const extra = Object.create(null);
     for (const [header, value] of Object.entries(row)) {
       if (header === '__row__') continue;
       const field = mapping[header];
       if (field) rec[field] = value;
-      else if (clean(value) !== '') extra[header] = clean(value);
+      else if (clean(value) !== '' && !mapHeaders([header]).mapping[header]) extra[header] = clean(value);
     }
 
     // Skip fully blank rows.
@@ -183,47 +163,46 @@ function parseRows(rows) {
     totalRows += 1;
 
     const rowErrors = [];
-    let firstName = clean(rec.firstName);
-    let lastName = clean(rec.lastName);
-    const fullName = clean(rec.name) || [firstName, lastName].filter(Boolean).join(' ');
-    if (!firstName && fullName) {
+    let firstName = String(clean(rec.firstName));
+    let lastName = String(clean(rec.lastName));
+    const fullName = String(clean(rec.name)) || [firstName, lastName].filter(Boolean).join(' ');
+    if (!firstName && clean(rec.name)) {
       const parts = fullName.split(/\s+/);
       firstName = parts[0];
       lastName = parts.slice(1).join(' ');
     }
     if (!fullName) rowErrors.push('Missing name');
-
-    const email = clean(rec.email).toLowerCase();
-    if (!email) rowErrors.push('Missing email');
-    else if (!EMAIL_RE.test(email)) rowErrors.push(`Invalid email "${email}"`);
+    if (!clean(rec.email)) rowErrors.push('Missing email');
 
     const joinDate = parseDate(rec.joinDate);
-    if (joinDate === null) rowErrors.push(`Unrecognised join date "${clean(rec.joinDate)}"`);
+    if (joinDate === null) rowErrors.push('Unrecognised join date');
     const dateOfBirth = parseDate(rec.dateOfBirth);
-
-    const designation = clean(rec.designation);
-    const role = normalizeRole(clean(rec.role), designation);
-
+    if (dateOfBirth === null) rowErrors.push('Unrecognised date of birth');
+    const phone = normalizePhone(rec.phone);
+    let department = normalizeDepartment(String(clean(rec.department)));
+    const team = String(clean(rec.team));
+    if (!department && DEPARTMENTS.includes(normalizeDepartment(team))) department = normalizeDepartment(team);
+    const { fields, errors: validationErrors } = validateEmployeeFields({
+      firstName, lastName, email: String(clean(rec.email)), phone, department,
+      designation: String(clean(rec.designation)), role: normalizeRole(String(clean(rec.role))),
+      joinDate: joinDate || '', dateOfBirth: dateOfBirth || ''
+    });
+    const email = fields.email || String(clean(rec.email)).toLowerCase();
+    rowErrors.push(...validationErrors);
     const record = {
+      ...fields,
       rowNumber,
-      employeeId: clean(rec.employeeId).toUpperCase(),
-      firstName,
-      lastName,
-      fullName,
-      email,
-      phone: normalizePhone(rec.phone),
-      role,
-      designation: designation || role,
-      department: normalizeDepartment(rec.department),
-      team: clean(rec.team),
-      manager: clean(rec.manager),
-      joinDate: joinDate || '',
-      isActive: isActiveStatus(rec.status),
-      password: clean(rec.password)
+      employeeId: String(clean(rec.employeeId)).toUpperCase(),
+      fullName: [fields.firstName, fields.lastName].filter(Boolean).join(' '),
+      phone,
+      team,
+      manager: String(clean(rec.manager)),
+      ...(clean(rec.status) !== '' ? { isActive: isActiveStatus(rec.status) } : {}),
+      ...(clean(rec.role) === '' ? { preserveExistingRole: true } : {})
     };
 
     const optional = {
-      personalEmail: clean(rec.personalEmail).toLowerCase(),
+      personalEmail: String(clean(rec.personalEmail)).toLowerCase(),
       dateOfBirth: dateOfBirth || '',
       gender: clean(rec.gender),
       bloodGroup: clean(rec.bloodGroup),
@@ -271,153 +250,150 @@ function parseRows(rows) {
   return { records: deduped, errors, mapping, unmapped, totalRows };
 }
 
-/**
- * Import employees.
- * @param {Array<Object>} rows        raw rows keyed by spreadsheet header
- * @param {Object} opts
- * @param {boolean} opts.dryRun       validate and report only (default true)
- * @param {boolean} opts.updateExisting  update users that already exist (matched by employee ID, then email)
- * @param {Object}  opts.importer     req.user of whoever runs the import (omit for CLI)
- */
-async function importEmployees(rows, opts = {}) {
-  const { dryRun = true, updateExisting = false, importer = null } = opts;
-  const { records, errors, mapping, unmapped, totalRows } = parseRows(rows);
+function referenceEntries(user) {
+  return [user.id, user.employeeId, user.sourceEmployeeId, user.email, user.fullName]
+    .filter(Boolean).map(value => String(value).trim().toLowerCase());
+}
 
-  // Load everyone once: the model filters in JS, so per-row queries would be O(n²).
-  const existingUsers = await User.find({});
-  const byEmail = new Map(existingUsers.filter((u) => u.email).map((u) => [String(u.email).toLowerCase(), u]));
-  const byEmpId = new Map(existingUsers.filter((u) => u.employeeId).map((u) => [String(u.employeeId).toUpperCase(), u]));
+function addUserReferences(index, user) {
+  for (const reference of referenceEntries(user)) {
+    if (!index.has(reference)) index.set(reference, user);
+    else if (index.get(reference)?.id !== user.id) index.set(reference, null);
+  }
+}
 
-  // Next free number per prefix, based on the highest existing ID (not count, which collides after deletions).
-  const counters = {};
-  const bumpCounter = (id) => {
-    const m = String(id || '').toUpperCase().match(/^([A-Z]+)(\d+)$/);
-    if (m) counters[m[1]] = Math.max(counters[m[1]] || 0, Number(m[2]));
-  };
-  existingUsers.forEach((u) => bumpCounter(u.employeeId));
-  records.forEach((r) => bumpCounter(r.employeeId));
-  const nextId = (role) => {
-    const p = rolePrefix(role);
-    counters[p] = (counters[p] || 0) + 1;
-    return `${p}${String(counters[p]).padStart(3, '0')}`;
-  };
+async function importEmployees(rows, { dryRun = true, updateExisting = false, importer = null } = {}) {
+  if (!rows.length || rows.length > 2000) throw Object.assign(new Error('Import requires 1–2,000 employee rows.'), { status: 400 });
+  const parsed = parseRows(rows);
+  if (!parsed.totalRows) throw Object.assign(new Error('No rows to import'), { status: 400 });
 
-  const created = [];
-  const updated = [];
-  const skipped = [];
-  const credentials = [];
-  const importedBy = importer ? (importer.name || importer.employeeId) : 'bulk-import';
-
-  for (const rec of records) {
-    const { rowNumber, password, ...fields } = rec;
-
-    if (!canAssignRole(importer?.role, fields.role)) {
-      errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: [`You are not allowed to create a ${fields.role}`] });
-      continue;
+  async function apply(client) {
+    const { records, errors, mapping, unmapped, totalRows } = parsed;
+    const { rows: existingRows } = await client.query('SELECT id, data FROM users');
+    const existingUsers = existingRows.map(row => ({ ...row.data, id: row.id }));
+    const byEmail = new Map();
+    const byEmployeeId = new Map();
+    for (const user of existingUsers) {
+      for (const [index, keys] of [[byEmail, [user.email]], [byEmployeeId, [user.employeeId, user.sourceEmployeeId]]]) {
+        for (const key of keys.filter(Boolean).map(value => String(value).trim().toLowerCase())) {
+          if (!index.has(key)) index.set(key, user);
+          else if (index.get(key)?.id !== user.id) index.set(key, null);
+        }
+      }
     }
+    const allowRole = role => !importer || canAssignEmployeeRole(importer.role, role);
+    const sheetError = (row, message) =>
+      errors.push({ row: row.rowNumber, name: row.fullName, email: row.email, errors: [message] });
+    const newRows = [];
+    const editedRows = [];
+    const skipped = [];
+    const updatedUsers = new Set();
+    const now = new Date().toISOString();
+    const importedBy = importer?.name || importer?.employeeId || 'bulk-import';
 
-    const existing = (fields.employeeId && byEmpId.get(fields.employeeId)) || byEmail.get(fields.email);
+    for (const row of records) {
+      const { rowNumber, employeeId, preserveExistingRole, ...fields } = row;
+      const codeMatch = byEmployeeId.get(employeeId.toLowerCase());
+      const emailMatch = byEmail.get(fields.email);
+      if (codeMatch === null || emailMatch === null) {
+        sheetError(row, 'Employee ID or email matches more than one account. Correct the existing accounts before importing.');
+        continue;
+      }
+      const existing = codeMatch || emailMatch;
+      if (!existing) {
+        if (!allowRole(fields.role)) {
+          sheetError(row, `You are not allowed to create a ${roleLabel(fields.role)}`);
+          continue;
+        }
+        newRows.push({ row, fields: { ...fields, sourceEmployeeId: employeeId || undefined } });
+        continue;
+      }
 
-    if (existing) {
-      // An email that belongs to someone else with a different employee ID is a conflict, not an update.
-      const emailOwner = byEmail.get(fields.email);
-      if (emailOwner && String(emailOwner._id) !== String(existing._id)) {
-        errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: [`Email already used by ${emailOwner.employeeId}`] });
+      if (emailMatch && emailMatch.id !== existing.id) {
+        sheetError(row, `Email already used by ${emailMatch.employeeId}`);
         continue;
       }
       if (!updateExisting) {
         skipped.push({ row: rowNumber, employeeId: existing.employeeId, name: fields.fullName, reason: 'Already exists' });
         continue;
       }
-      if (!canAssignRole(importer?.role, existing.role)) {
-        errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: [`You are not allowed to modify a ${existing.role}`] });
+      if (updatedUsers.has(existing.id)) {
+        sheetError(row, 'Another row already updates this employee');
         continue;
       }
-      const changes = Object.fromEntries(Object.entries(fields).filter(([k, v]) => v !== '' && k !== 'employeeId'));
-      if (importer && changes.isActive === false && existing.isActive !== false && !canTerminateUser(importer, existing)) {
-        errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: ['You cannot deactivate this employee'] });
+
+      const changes = Object.fromEntries(Object.entries(fields).filter(([_key, value]) => value !== ''));
+      if (preserveExistingRole) delete changes.role;
+      const targetRole = effectiveRole(existing);
+      const nextRole = effectiveRole({ ...existing, ...changes });
+      if (importer && (!canTerminateUser(importer, existing) ||
+          (targetRole !== nextRole && !canChangeEmployeeRole(importer, existing, nextRole)))) {
+        sheetError(row, `You are not allowed to modify a ${roleLabel(targetRole)}`);
         continue;
       }
-      if (!dryRun) await User.findByIdAndUpdate(existing._id, { $set: { ...changes, updatedBy: importedBy } });
-      updated.push({ row: rowNumber, employeeId: existing.employeeId, name: fields.fullName, email: fields.email, role: fields.role });
-      continue;
+      if (changes.isActive === false) {
+        changes.isOnline = false;
+        if (existing.isActive !== false) changes.passwordVersion = randomUUID();
+      }
+      updatedUsers.add(existing.id);
+      editedRows.push({ row, existing, changes: { ...changes, updatedAt: now, updatedBy: importedBy } });
     }
 
-    const employeeId = fields.employeeId || nextId(fields.role);
-    const initialPassword = password || generatePassword();
-    const policyError = passwordError(initialPassword);
-    if (policyError) {
-      errors.push({ row: rowNumber, name: fields.fullName, email: fields.email, errors: [policyError] });
-      continue;
+    const allocations = new Map();
+    if (!dryRun) {
+      const byRole = Object.groupBy(newRows, ({ fields }) => fields.role);
+      for (const [role, group] of Object.entries(byRole)) {
+        allocations.set(role, await allocateEmployeeIds(role, group.length, client));
+      }
     }
-    const doc = {
-      ...fields,
-      employeeId,
-      password: initialPassword,
-      joinDate: fields.joinDate || new Date().toISOString().split('T')[0],
-      createdByName: importedBy,
-      importedAt: new Date().toISOString(),
-      leaveBalance: { Sick: 12, Casual: 10, Annual: 15, Emergency: 5, Other: 3 }
+
+    const createdRows = newRows.map(({ row, fields }) => ({
+      row,
+      user: newEmployee({ isActive: true, ...fields, createdByName: importedBy, importedAt: now },
+        allocations.get(fields.role)?.shift())
+    }));
+    const references = new Map();
+    for (const user of existingUsers.filter(user => !updatedUsers.has(user.id))) addUserReferences(references, user);
+    for (const { existing, changes } of editedRows) addUserReferences(references, { ...existing, ...changes });
+    for (const { user } of createdRows) addUserReferences(references, user);
+
+    const managerWarnings = [];
+    const linkManager = (record, row, fallback = record) => {
+      const key = record.manager?.trim().toLowerCase();
+      if (!key) return;
+      const manager = references.get(key);
+      if (manager && manager.id !== fallback.id) {
+        record.managerId = manager.id;
+        record.manager = manager.fullName;
+      } else {
+        record.managerId = '';
+        managerWarnings.push({ row: row.rowNumber, employeeId: fallback.employeeId, manager: record.manager, warning: 'Manager not found uniquely in the system; kept as text.' });
+      }
     };
+    createdRows.forEach(({ row, user }) => linkManager(user, row));
+    editedRows.forEach(({ row, existing, changes }) => linkManager(changes, row, existing));
 
     if (!dryRun) {
-      const user = await User.create(doc);
-      byEmail.set(fields.email, user);
-      byEmpId.set(employeeId, user);
-      existingUsers.push(user);
-    } else {
-      // Reserve so later rows in the same dry run see it.
-      byEmail.set(fields.email, { _id: `dry-${rowNumber}`, employeeId, email: fields.email });
-      byEmpId.set(employeeId, { _id: `dry-${rowNumber}`, employeeId, email: fields.email });
+      await insertEmployees(client, createdRows.map(({ user }) => user));
+      await updateEmployees(client, editedRows.map(({ existing, changes }) => ({ ...changes, userIdForUpdate: existing.id })));
     }
-    created.push({ row: rowNumber, employeeId, name: fields.fullName, email: fields.email, role: fields.role, department: fields.department });
-    credentials.push({ employeeId, name: fields.fullName, email: fields.email, password: dryRun ? '(generated on import)' : initialPassword });
-  }
 
-  // Second pass: link managers (by name, employee ID or email) so "Reporting Manager" becomes managerId.
-  const managerWarnings = [];
-  if (!dryRun) {
-    const all = await User.find({});
-    const find = (ref) => {
-      const key = String(ref || '').trim().toLowerCase();
-      if (!key) return null;
-      return all.find((u) => String(u.employeeId || '').toLowerCase() === key ||
-        String(u.email || '').toLowerCase() === key ||
-        String(u.fullName || `${u.firstName || ''} ${u.lastName || ''}`).trim().toLowerCase() === key);
+    const describe = (row, user) => ({
+      row: row.rowNumber, id: dryRun ? undefined : user.id, employeeId: user.employeeId,
+      name: user.fullName, email: user.email, role: effectiveRole(user), department: user.department,
+      setupEmailStatus: dryRun ? undefined : user.setupEmailStatus
+    });
+    const created = createdRows.map(({ row, user }) => describe(row, user));
+    const updated = editedRows.map(({ row, existing, changes }) => describe(row, { ...existing, ...changes }));
+    return {
+      dryRun,
+      summary: { totalRows, toCreate: created.length, toUpdate: updated.length, skipped: skipped.length, errors: errors.length },
+      columnMapping: mapping, unmappedColumns: unmapped, created, updated, skipped,
+      errors: errors.sort((a, b) => a.row - b.row), managerWarnings
     };
-    const touched = new Set([...created, ...updated].map((c) => c.employeeId));
-    for (const u of all) {
-      if (!touched.has(u.employeeId) || !u.manager) continue;
-      const mgr = find(u.manager);
-      if (mgr && String(mgr._id) !== String(u._id)) {
-        const mgrName = mgr.fullName || `${mgr.firstName || ''} ${mgr.lastName || ''}`.trim();
-        if (u.managerId !== String(mgr._id) || u.manager !== mgrName) {
-          await User.findByIdAndUpdate(u._id, { $set: { managerId: String(mgr._id), manager: mgrName } });
-        }
-      } else if (!mgr) {
-        managerWarnings.push({ employeeId: u.employeeId, manager: u.manager, warning: 'Manager not found in system; kept as text' });
-      }
-    }
   }
 
-  return {
-    dryRun,
-    summary: {
-      totalRows,
-      toCreate: created.length,
-      toUpdate: updated.length,
-      skipped: skipped.length,
-      errors: errors.length
-    },
-    columnMapping: mapping,
-    unmappedColumns: unmapped,
-    created,
-    updated,
-    skipped,
-    errors: errors.sort((a, b) => a.row - b.row),
-    managerWarnings,
-    credentials: dryRun ? [] : credentials
-  };
+  return dryRun ? apply({ query }) : withEmployeeIdentityLock(apply);
 }
 
 module.exports = { importEmployees, parseRows, mapHeaders, normalizeRole, parseDate, normalizePhone, HEADER_ALIASES, VALID_ROLES };

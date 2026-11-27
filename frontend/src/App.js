@@ -1,15 +1,9 @@
-import { BarChart3 as IconBarChart3, Bell as IconBell, Briefcase as IconBriefcase, Calendar as IconCalendar, Clock as IconClock, FileText as IconFileText, Home as IconHome, Idea as IconIdea, Inbox as IconInbox, Tasks as IconTasks, User as IconUser, UserPlus as IconUserPlus, Lock as IconLock, Users as IconUsers, Zap as IconZap } from './components/Common/Icons';
-// src/App.js
 import React, { useState, useEffect, useCallback } from 'react';
-import spacebornLogo from './assets/spaceborn-logo.png';
 import ShiftTimer from './components/Common/ShiftTimer';
 import ResourceReview from './components/Common/ResourceReview';
-import EmployeeAccess from './components/Common/EmployeeAccess';
 import { setDisplayTimeZone } from './utils/timeZone';
 import LoginSystem from './components/Login/LoginSystem';
-import LogoutButton from './components/Login/LogoutButton';
 import SessionManager from './components/Login/SessionManager';
-import ProtectedRoute from './components/Login/ProtectedRoute';
 import authService from './services/authService';
 import employeeService from './services/employeeService';
 import { normalizeDepartmentFields } from './utils/departments';
@@ -43,7 +37,6 @@ import ManagerAccounts from './components/Dashboard/Manager/Accounts';
 import ManagerMeetings from './components/Dashboard/Manager/Meetings';
 import ManagerAIInsights from './components/Dashboard/Manager/AIInsights';
 import ManagerNotifications from './components/Dashboard/Manager/Notifications.jsx';
-import ManagerActivityMonitor from './components/Dashboard/Manager/ActivityMonitor';
 import EmployeeManagement from './components/Dashboard/Manager/EmployeeManagement';
 import ManagerTeamReports from './components/Dashboard/Manager/TeamReports';
 import ManagerAttendanceView from './components/Dashboard/Manager/AttendanceView';
@@ -59,7 +52,6 @@ import COOAccounts from './components/Dashboard/COO/Accounts';
 import COOMeetings from './components/Dashboard/COO/Meetings';
 import COOAIInsights from './components/Dashboard/COO/AIInsights';
 import COONotifications from './components/Dashboard/COO/Notifications.jsx';
-import COOActivityMonitor from './components/Dashboard/COO/ActivityMonitor';
 import COOEmployeeManagement from './components/Dashboard/COO/EmployeeManagement';
 import COOTeamReports from './components/Dashboard/COO/TeamReports';
 import COOAttendanceView from './components/Dashboard/COO/AttendanceView';
@@ -83,88 +75,125 @@ import MemberResources from './components/Dashboard/Member/Resources';
 import MemberMeetings from './components/Dashboard/Member/Meetings';
 import MemberNotifications from './components/Dashboard/Member/Notifications.jsx';
 import MemberProfileView from './components/Dashboard/Member/MemberProfileView';
+import DashboardNavigation, { menuSections } from './components/Layout/DashboardNavigation';
+import LoginManagement from './components/Dashboard/Manager/LoginManagement';
+import ImportEmployeesModal from './components/Dashboard/Manager/ImportEmployeesModal';
+import ProfilePreferences from './components/Common/ProfilePreferences';
+import { ChangePasswordForm } from './components/Login/ChangePassword.jsx';
 import { roleLabel } from './utils/roleLabels';
 
 const publicAuthPages = new Set(['/signup', '/forgot-password', '/reset-password']);
 const dashboardMenuKey = user => `spaceborn:dashboard:${user.id}:${user.role}:${window.location.pathname}`;
 
-function readDashboardMenus(user) {
+function menuSlot(role) {
+  if (role === 'CEO') return 'executive';
+  if (role === 'COO' || role === 'Manager') return 'manager';
+  if (role === 'Team Lead' || roleLabel(role) === 'Co-Lead') return 'teamLead';
+  return 'member';
+}
+
+function permittedSection(user, section) {
+  if (menuSections(user.role).includes(section)) return section;
+  return user.role === 'CEO' && window.location.pathname === '/signup-requests' ? 'SignupRequests' : 'Dashboard';
+}
+
+function readDashboardMenu(user) {
+  const key = dashboardMenuKey(user);
   try {
-    return JSON.parse(sessionStorage.getItem(dashboardMenuKey(user))) || {};
+    if (window.history.state?.crmMenu?.key === key) return window.history.state.crmMenu.section;
+    const saved = JSON.parse(sessionStorage.getItem(key));
+    return typeof saved === 'string' ? saved : saved?.[menuSlot(user.role)];
   } catch {
-    return {};
+    return undefined;
   }
+}
+
+function rememberDashboardMenu(user, section, action) {
+  const key = dashboardMenuKey(user);
+  window.history[action]({ ...window.history.state, crmMenu: { key, section } }, '', window.location.href);
+  try {
+    sessionStorage.setItem(key, JSON.stringify(section));
+  } catch {
+    // Browser history still supports navigation when storage is unavailable.
+  }
+}
+
+const managementComponents = {
+  CEO: {
+    Dashboard: CEODashboard, TaskManagement, Projects, TeamsAndRoles, Accounts,
+    TeamReports: CEOTeamReports, Automation: AutomationDashboard, Attendance: AttendanceView,
+    Meetings, AIInsights, Notifications, ResourceAllocation
+  },
+  COO: {
+    Dashboard: COODashboard, TaskManagement: COOTaskManagement, Projects: COOProjects,
+    TeamsAndRoles: COOTeamsAndRoles, Accounts: COOAccounts, TeamReports: COOTeamReports,
+    Automation: COOAutomationDashboard, Attendance: COOAttendanceView, Meetings: COOMeetings,
+    AIInsights: COOAIInsights, Notifications: COONotifications, ResourceAllocation: COOResourceAllocation
+  },
+  Manager: {
+    Dashboard: ManagerDashboard, TaskManagement: ManagerTaskManagement, Projects: ManagerProjects,
+    TeamsAndRoles: ManagerTeamsAndRoles, Accounts: ManagerAccounts, TeamReports: ManagerTeamReports,
+    Automation: ManagerAutomationDashboard, Attendance: ManagerAttendanceView, Meetings: ManagerMeetings,
+    AIInsights: ManagerAIInsights, Notifications: ManagerNotifications, ResourceAllocation: ResourceReview
+  }
+};
+const leadComponents = {
+  Dashboard: TeamLeadDashboard, TaskManagement: TeamLeadTaskManagement, TeamsAndRoles: TeamLeadTeamsAndRoles,
+  MVPRoadmap, Meetings: TeamLeadMeetings, Notifications: TeamLeadNotifications
+};
+const memberComponents = {
+  Dashboard: MemberDashboard, TaskManagement: MemberTaskManagement, DailyReport: DailyWorkReport,
+  MyTeam, Resources: MemberResources, Meetings: MemberMeetings, Notifications: MemberNotifications
+};
+
+function ProfileSummary({ user }) {
+  return (
+    <section className="card max-w-4xl border border-base-300 bg-base-100">
+      <div className="card-body">
+        <h2 className="card-title">{user.name}</h2>
+        <p>{roleLabel(user.role)}</p>
+        {user.department && <p className="text-base-content/70">{user.department}</p>}
+      </div>
+    </section>
+  );
 }
 
 function App() {
   const [user, setUser] = useState(null);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [sessionRestore, setSessionRestore] = useState(() => {
     const path = window.location.pathname.replace(/\/+$/, '');
     return authService.getToken() && !publicAuthPages.has(path) ? 'checking' : 'ready';
   });
   const [activeMenu, setActiveMenu] = useState('Dashboard');
   const [navigationOpen, setNavigationOpen] = useState(false);
-  const [completedActions, setCompletedActions] = useState([]);
-  const [managerActiveMenu, setManagerActiveMenu] = useState('Dashboard');
-  const [teamLeadActiveMenu, setTeamLeadActiveMenu] = useState('Dashboard');
-  const [memberActiveMenu, setMemberActiveMenu] = useState('Dashboard');
-  const [showNotificationsPanel, setShowNotificationsPanel] = useState(false);
-  const [isLoading, setIsLoading] = useState(false);
   const [employees, setEmployees] = useState([]);
+  const [employeeError, setEmployeeError] = useState('');
+  const [employeesLoading, setEmployeesLoading] = useState(false);
 
-  // Fetch employees using employeeService
   const fetchEmployees = useCallback(async () => {
+    setEmployeesLoading(true);
+    setEmployeeError('');
     try {
       const data = await employeeService.getAllEmployees();
+      if (!Array.isArray(data)) throw new Error('Employee data was unavailable.');
       setEmployees(data);
-    } catch (error) {
-      console.error('Error fetching employees:', error);
-      setEmployees([
-        { id: 1, name: 'John Doe', role: 'CEO', department: 'Platform and DevOps', email: '', employeeId: 'CEO001', phone: '+1 (555) 000-0001', joinDate: '2020-01-15', status: 'Active', manager: 'N/A' },
-        { id: 2, name: 'Jane Smith', role: 'Manager', department: 'Platform and DevOps', email: 'jane.smith@spaceborn.com', employeeId: 'MGR001', phone: '+1 (555) 000-0002', joinDate: '2020-03-20', status: 'Active', manager: 'John Doe' },
-        { id: 3, name: 'Mike Johnson', role: 'Team Lead', department: 'Core Systems', email: 'mike.johnson@spaceborn.com', employeeId: 'LD001', phone: '+1 (555) 000-0003', joinDate: '2021-02-10', status: 'Active', manager: 'Jane Smith' },
-        { id: 4, name: 'Ravi Das', role: 'Member', department: 'Core Systems', email: 'ravi.das@spaceborn.com', employeeId: 'EMP001', phone: '+1 (555) 000-0004', joinDate: '2022-06-01', status: 'Active', manager: 'Mike Johnson' },
-        { id: 5, name: 'Priya Sharma', role: 'Member', department: 'Core Systems', email: 'priya.sharma@spaceborn.com', employeeId: 'EMP002', phone: '+1 (555) 000-0005', joinDate: '2022-08-15', status: 'Active', manager: 'Mike Johnson' },
-        { id: 6, name: 'Alex Chen', role: 'Member', department: 'Core Systems', email: 'alex.chen@spaceborn.com', employeeId: 'EMP003', phone: '+1 (555) 000-0006', joinDate: '2023-01-10', status: 'Active', manager: 'Mike Johnson' },
-        { id: 7, name: 'Sarah Williams', role: 'Team Lead', department: 'Robotics & Simulation', email: 'sarah.williams@spaceborn.com', employeeId: 'LD002', phone: '+1 (555) 000-0007', joinDate: '2021-05-20', status: 'Active', manager: 'Jane Smith' },
-        { id: 8, name: 'David Brown', role: 'Member', department: 'Robotics & Simulation', email: 'david.brown@spaceborn.com', employeeId: 'EMP004', phone: '+1 (555) 000-0008', joinDate: '2022-09-01', status: 'Active', manager: 'Sarah Williams' },
-        { id: 9, name: 'Emily Davis', role: 'Member', department: 'Robotics & Simulation', email: 'emily.davis@spaceborn.com', employeeId: 'EMP005', phone: '+1 (555) 000-0009', joinDate: '2023-03-15', status: 'Active', manager: 'Sarah Williams' },
-        { id: 10, name: 'Anil Mehta', role: 'Team Lead', department: 'Hardware & Integration', email: 'anil.mehta@spaceborn.com', employeeId: 'LD003', phone: '+1 (555) 000-0010', joinDate: '2021-06-10', status: 'Active', manager: 'Jane Smith' },
-      ]);
+    } catch {
+      setEmployeeError('Could not load employee records. Try again.');
+    } finally {
+      setEmployeesLoading(false);
     }
   }, []);
 
-  const getUserDepartment = () => {
-    if (!user) return null;
-    return user.department || null;
-  };
-
-  const handleTimeZoneChange = timeZone => {
-    const updated = { ...user, timeZone };
-    setDisplayTimeZone(timeZone);
-    localStorage.setItem('user', JSON.stringify(updated));
-    setUser(updated);
-  };
-
-  const handleLoginSuccess = useCallback((userData, openTeam = false, menus = {}) => {
-    if (!userData || !userData.role) {
-      console.error('Invalid user data received:', userData);
-      return;
-    }
-    
-    const normalizedUserData = normalizeDepartmentFields(userData);
-    setDisplayTimeZone(normalizedUserData.timeZone);
-    localStorage.setItem('user', JSON.stringify(normalizedUserData));
-    setUser(normalizedUserData);
-    setIsLoggedIn(true);
-    const ceoDefault = userData.role === 'CEO' && window.location.pathname === '/signup-requests' ? 'SignupRequests' : 'Dashboard';
-    setActiveMenu(menus.executive || ceoDefault);
-    setManagerActiveMenu(menus.manager || 'Dashboard');
-    setTeamLeadActiveMenu(menus.teamLead || 'Dashboard');
-    setMemberActiveMenu(openTeam && userData.role === 'Member' ? 'MyTeam' : menus.member || 'Dashboard');
-    fetchEmployees();
-  }, [fetchEmployees]);
+  const handleLoginSuccess = useCallback((userData, openTeam = false, restoredSection) => {
+    if (!userData?.role) return;
+    const normalized = normalizeDepartmentFields(userData);
+    const section = permittedSection(normalized, openTeam && normalized.role === 'Member' ? 'MyTeam' : restoredSection);
+    setDisplayTimeZone(normalized.timeZone);
+    localStorage.setItem('user', JSON.stringify(normalized));
+    setUser(normalized);
+    setActiveMenu(section);
+    rememberDashboardMenu(normalized, section, 'replaceState');
+  }, []);
 
   useEffect(() => {
     if (sessionRestore !== 'checking') return;
@@ -176,7 +205,7 @@ function App() {
       try {
         const result = await authService.verifyToken({ signal: controller.signal });
         if (canceled) return;
-        if (result.success) handleLoginSuccess(result.user, false, readDashboardMenus(result.user));
+        if (result.success) handleLoginSuccess(result.user, false, readDashboardMenu(result.user));
         setSessionRestore(result.retryable ? 'unavailable' : 'ready');
       } catch {
         if (!canceled) setSessionRestore('unavailable');
@@ -195,122 +224,153 @@ function App() {
 
   useEffect(() => {
     if (!user) return;
-    sessionStorage.setItem(dashboardMenuKey(user), JSON.stringify({
-      executive: activeMenu,
-      manager: managerActiveMenu,
-      teamLead: teamLeadActiveMenu,
-      member: memberActiveMenu
-    }));
-  }, [user, activeMenu, managerActiveMenu, teamLeadActiveMenu, memberActiveMenu]);
+    const restoreHistory = event => {
+      const key = dashboardMenuKey(user);
+      const section = permittedSection(user, event.state?.crmMenu?.key === key ? event.state.crmMenu.section : undefined);
+      setActiveMenu(section);
+      setNavigationOpen(false);
+      rememberDashboardMenu(user, section, 'replaceState');
+    };
+    window.addEventListener('popstate', restoreHistory);
+    return () => window.removeEventListener('popstate', restoreHistory);
+  }, [user]);
 
-  const handleLogout = async () => {
-    await authService.logout();
-    if (user) sessionStorage.removeItem(dashboardMenuKey(user));
-    localStorage.removeItem('userSession');
-    localStorage.removeItem('user');
-    localStorage.removeItem('authToken');
-    localStorage.removeItem('rememberedEmployeeId');
-    
+  useEffect(() => {
+    if (user && !user.mustChangePassword && activeMenu === 'EmployeeManagement') fetchEmployees();
+  }, [user, activeMenu, fetchEmployees]);
+
+  function navigate(section) {
+    const selection = permittedSection(user, section);
+    setNavigationOpen(false);
+    if (selection === activeMenu) return;
+    rememberDashboardMenu(user, selection, 'pushState');
+    setActiveMenu(selection);
+  }
+
+  const clearWorkspace = useCallback(() => {
+    if (user) {
+      sessionStorage.removeItem(dashboardMenuKey(user));
+      const state = { ...window.history.state };
+      delete state.crmMenu;
+      window.history.replaceState(state, '', window.location.href);
+    }
+    authService.clearSession();
     setUser(null);
-    setIsLoggedIn(false);
     setEmployees([]);
     setActiveMenu('Dashboard');
-    setManagerActiveMenu('Dashboard');
-    setTeamLeadActiveMenu('Dashboard');
-    setMemberActiveMenu('Dashboard');
-  };
+    setNavigationOpen(false);
+  }, [user]);
 
-  const handleSessionExpired = () => {
-    alert('Your session has expired. Please login again.');
-    handleLogout();
-  };
-
-  const getFilteredEmployees = () => {
-    if (!user) return [];
-    
-    if (user.role === 'CEO' || user.role === 'Manager' || user.role === 'COO') {
-      return employees;
-    }
-    if (user.role === 'Team Lead' || user.role === 'Co-Head' || user.role === 'CO Head') {
-      const userDept = getUserDepartment();
-      return employees.filter(emp => emp.department === userDept);
-    }
-    
-    if (user.role === 'Member') {
-      return employees.filter(emp => emp.id === user.id || emp.email === user.email);
-    }
-    
-    return [];
-  };
-
-  const getAccessLevelText = () => {
-    if (!user) return '';
-    if (user.role === 'CEO') return 'Full company access — Viewing all employees';
-    if (user.role === 'Manager') return 'Full company access — Viewing all employees';
-    if (user.role === 'COO') return 'Full company access - Viewing all employees';
-    if (user.role === 'Team Lead' || user.role === 'Co-Head' || user.role === 'CO Head') {
-      const dept = getUserDepartment();
-      return `Department-level access — Viewing ${dept} team (${getFilteredEmployees().length} members)`;
-    }
-    if (user.role === 'Member') {
-      return `Personal access — Viewing and editing your own profile only`;
-    }
-    return '';
-  };
-
-  const handleUpdateEmployee = async (updatedEmployee) => {
+  const handleLogout = useCallback(async () => {
     try {
-      const result = await employeeService.updateEmployee(updatedEmployee.id, updatedEmployee);
-      if (result) {
-        setEmployees(prevEmployees => 
-          prevEmployees.map(emp => 
-            emp.id === updatedEmployee.id ? result : emp
-          )
-        );
-        if (user && user.id === updatedEmployee.id) {
-          setUser(result);
-        }
-      }
-      return result;
-    } catch (error) {
-      console.error('Error updating employee:', error);
-      setEmployees(prevEmployees => 
-        prevEmployees.map(emp => 
-          emp.id === updatedEmployee.id ? updatedEmployee : emp
-        )
-      );
-      if (user && user.id === updatedEmployee.id) {
-        setUser(updatedEmployee);
-      }
-      return updatedEmployee;
+      await authService.logout();
+    } finally {
+      clearWorkspace();
     }
-  };
+  }, [clearWorkspace]);
 
-  const handleAddEmployee = async (newEmployee) => {
-    try {
-      const result = await employeeService.addEmployee(newEmployee);
-      if (result) {
-        setEmployees(prev => [...prev, result]);
-      }
-      return result;
-    } catch (error) {
-      console.error('Error adding employee:', error);
-      const tempEmployee = { ...newEmployee, id: Date.now() };
-      setEmployees(prev => [...prev, tempEmployee]);
-      return tempEmployee;
-    }
-  };
+  useEffect(() => {
+    if (!user) return;
+    window.addEventListener('spaceborn:session-rejected', clearWorkspace);
+    return () => window.removeEventListener('spaceborn:session-rejected', clearWorkspace);
+  }, [user, clearWorkspace]);
 
-  const handleDeleteEmployee = async (employeeId) => {
-    try {
-      await employeeService.deleteEmployee(employeeId);
-      setEmployees(prev => prev.filter(emp => String(emp.id || emp._id) !== String(employeeId)));
-      return true;
-    } catch (error) {
-      console.error('Error deleting employee:', error);
-      return false;
+  function handleTimeZoneChange(timeZone) {
+    const updated = { ...user, timeZone };
+    setDisplayTimeZone(timeZone);
+    localStorage.setItem('user', JSON.stringify(updated));
+    setUser(updated);
+  }
+
+  async function handleUpdateEmployee(updatedEmployee) {
+    const { id, ...fields } = updatedEmployee;
+    const result = await employeeService.updateEmployee(id, fields);
+    setEmployees(records => records.map(record => record.id === id ? { ...record, ...result } : record));
+    if (user.id === updatedEmployee.id) {
+      const updated = { ...user, ...result };
+      localStorage.setItem('user', JSON.stringify(updated));
+      setUser(updated);
     }
-  };
+    return result;
+  }
+
+  async function handleAddEmployee(employee) {
+    const result = await employeeService.addEmployee(employee);
+    if (result) setEmployees(records => [...records, result]);
+    return result;
+  }
+
+  async function handleDeleteEmployee(id) {
+    await employeeService.deleteEmployee(id);
+    setEmployees(records => records.filter(record => String(record.id || record._id) !== String(id)));
+    return true;
+  }
+
+  function renderSection() {
+    const role = user.role;
+    const hr = role === 'HR' || role === 'Coordinator';
+    const lead = role === 'Team Lead' || roleLabel(role) === 'Co-Lead';
+    const department = user.department || null;
+
+    switch (activeMenu) {
+      case 'SignupRequests':
+        return <SignupRequests />;
+      case 'LoginManagement':
+        return <LoginManagement />;
+      case 'ActivityMonitor':
+        return <ActivityMonitor userRole={role} />;
+      case 'MyProfile':
+        return <>
+          {role === 'Member'
+            ? <MemberProfileView userData={user} onUpdate={handleUpdateEmployee} />
+            : <ProfileSummary user={user} />}
+          <ProfilePreferences user={user} onTimeZoneChange={handleTimeZoneChange} />
+          <section className="card mx-auto mt-4 max-w-4xl border border-base-300 bg-base-100">
+            <div className="card-body">
+              <h2 className="card-title">Change password</h2>
+              <ChangePasswordForm onChanged={handleLogout} />
+            </div>
+          </section>
+        </>;
+      case 'EmployeeManagement': {
+        if (employeesLoading) return <p role="status">Loading employees…</p>;
+        if (employeeError) return <div role="alert" className="alert alert-error">{employeeError}
+          <button type="button" className="btn btn-sm" onClick={fetchEmployees}>Try again</button>
+        </div>;
+        const EmployeePage = role === 'COO' ? COOEmployeeManagement : EmployeeManagement;
+        return <EmployeePage employees={employees} userRole={role} userDepartment={department}
+          canEdit canAdd canDelete onUpdateEmployee={handleUpdateEmployee}
+          onAddEmployee={handleAddEmployee} onDeleteEmployee={handleDeleteEmployee} onImportComplete={fetchEmployees} />;
+      }
+      case 'ImportEmployees':
+        return <ImportEmployeesModal onClose={() => navigate('EmployeeManagement')} onImported={fetchEmployees} />;
+      case 'Leave':
+      case 'LeaveManagement':
+        return <LeaveManagement user={user} userRole={role}
+          userDepartment={role === 'Manager' || role === 'COO' ? null : department} />;
+      case 'Resources':
+        if (hr) return <ResourceReview />;
+        if (lead) return <>
+          {role === 'Team Lead' && <ResourceReview />}
+          <TeamLeadResources userRole={role} />
+        </>;
+        break;
+      case 'Dashboard':
+        if (hr) return <section className="space-y-4"><h1 className="text-2xl font-semibold">Dashboard</h1><ProfileSummary user={user} /></section>;
+        break;
+      case 'Attendance':
+        if (hr) return <ManagerAttendanceView userRole={role} />;
+        break;
+      default:
+        break;
+    }
+
+    const sections = managementComponents[role] || (lead ? leadComponents : hr ? { Notifications: MemberNotifications } : memberComponents);
+    const Page = sections[activeMenu];
+    const featureRole = role === 'COO' && !['Dashboard', 'Accounts', 'TeamReports'].includes(activeMenu) ? 'Manager' : role;
+    return Page ? <Page user={user} userRole={featureRole} department={role === 'CEO' ? department : null}
+      onLogout={handleLogout} onNavigate={navigate} /> : null;
+  }
 
   if (sessionRestore !== 'ready') {
     return (
@@ -331,604 +391,36 @@ function App() {
     );
   }
 
-  if (!isLoggedIn || !user) {
-    return <LoginSystem onLoginSuccess={handleLoginSuccess} />;
-  }
+  if (!user) return <LoginSystem onLoginSuccess={handleLoginSuccess} />;
 
-  // ==================== CEO DASHBOARD ====================
-  if (user.role === 'CEO') {
+  if (user.mustChangePassword) {
     return (
-      <ProtectedRoute user={user} requiredRoles={['CEO']}>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-          <ShiftTimer user={user} onLogout={handleLogout} onTimeZoneChange={handleTimeZoneChange}
-            navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(open => !open)} />
-          <div className="flex flex-1">
-            <aside className={`fixed bottom-0 left-0 top-[88px] md:top-[73px] z-40 flex w-64 flex-col overflow-y-auto border-r border-base-300 bg-base-100 ${navigationOpen ? '' : 'max-md:hidden'}`}>
-              <div className="p-6 border-b border-gray-200 flex justify-center">
-                <img src={spacebornLogo} alt="Spaceborn" className="h-16 w-auto object-contain" />
-              </div>
-              <div className="px-4 py-3 border-b border-gray-100">
-                <span className="badge badge-outline">{roleLabel(user.role)}</span>
-              </div>
-              <nav aria-label="Dashboard navigation" onClick={event => { if (event.target.closest('button')) setNavigationOpen(false); }} className="flex-1 p-4">
-                {/* OVERVIEW Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('Dashboard')} aria-current={activeMenu === 'Dashboard' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left transition-all ${activeMenu === 'Dashboard' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconHome className="w-5 h-5" />
-                      <span className="text-sm font-medium">Dashboard</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('TaskManagement')} aria-current={activeMenu === 'TaskManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'TaskManagement' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconTasks className="w-5 h-5" />
-                      <span className="text-sm font-medium">Task Management</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('Projects')} aria-current={activeMenu === 'Projects' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Projects' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBriefcase className="w-5 h-5" />
-                      <span className="text-sm font-medium">Projects</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* MANAGEMENT Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('TeamsAndRoles')} aria-current={activeMenu === 'TeamsAndRoles' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'TeamsAndRoles' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUsers className="w-5 h-5" />
-                      <span className="text-sm font-medium">Teams & Roles</span>
-                    </button>
-                    <button type="button" onClick={() => setActiveMenu('SignupRequests')}
-                      className={`btn btn-sm w-full justify-start ${activeMenu === 'SignupRequests' ? 'btn-active' : 'btn-ghost'}`}>
-                      <IconUserPlus className="h-5 w-5" /> Signup requests
-                    </button>
-                    <button onClick={() => setActiveMenu('Accounts')} aria-current={activeMenu === 'Accounts' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Accounts' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUser className="w-5 h-5" />
-                      <span className="text-sm font-medium">Accounts</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('EmployeeManagement')} aria-current={activeMenu === 'EmployeeManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'EmployeeManagement' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUser className="w-5 h-5" />
-                      <span className="text-sm font-medium">Employee Database</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* REPORTS Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('TeamReports')} aria-current={activeMenu === 'TeamReports' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'TeamReports' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconFileText className="w-5 h-5" />
-                      <span className="text-sm font-medium">Team Reports & MVP Roadmaps</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('LeaveManagement')} aria-current={activeMenu === 'LeaveManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'LeaveManagement' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Leave Management</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* AUTOMATION Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('Automation')} aria-current={activeMenu === 'Automation' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Automation' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconZap className="w-5 h-5" />
-                      <span className="text-sm font-medium">System Automation</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* RESOURCES Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('ResourceAllocation')} aria-current={activeMenu === 'ResourceAllocation' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'ResourceAllocation' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconInbox className="w-5 h-5" />
-                      <span className="text-sm font-medium">Resource Allocation</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* ATTENDANCE Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('Attendance')} aria-current={activeMenu === 'Attendance' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Attendance' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconClock className="w-5 h-5" />
-                      <span className="text-sm font-medium">Attendance</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* TOOLS Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('Meetings')} aria-current={activeMenu === 'Meetings' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Meetings' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Meetings</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('AIInsights')} aria-current={activeMenu === 'AIInsights' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'AIInsights' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconIdea className="w-5 h-5" />
-                      <span className="text-sm font-medium">AI Insights</span>
-                    </button>
-                    <button onClick={() => setActiveMenu('Notifications')} aria-current={activeMenu === 'Notifications' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'Notifications' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBell className="w-5 h-5" />
-                      <span className="text-sm font-medium">Notifications</span>
-                    </button>
-                  </div>
-                </div>
-
-                {/* SYSTEM Section */}
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setActiveMenu('ActivityMonitor')} aria-current={activeMenu === 'ActivityMonitor' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${activeMenu === 'ActivityMonitor' ? 'bg-purple-50 text-purple-700' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBarChart3 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Activity Monitor</span>
-                    </button>
-                  </div>
-                </div>
-              </nav>
-              <div className="p-4 border-t border-gray-200">
-                <LogoutButton onLogout={handleLogout} />
-              </div>
-            </aside>
-            <main className="min-w-0 flex-1 overflow-y-auto md:ml-64">
-              <div className="p-4 sm:p-8">
-                {activeMenu === 'SignupRequests' && <SignupRequests />}
-                {activeMenu === 'Dashboard' && <CEODashboard user={user} onLogout={handleLogout} />}
-                {activeMenu === 'TaskManagement' && <TaskManagement userRole={user.role} />}
-                {activeMenu === 'Projects' && <Projects userRole={user.role} />}
-                {activeMenu === 'TeamsAndRoles' && <TeamsAndRoles userRole={user.role} />}
-                {activeMenu === 'Accounts' && <Accounts userRole={user.role} />}
-                {activeMenu === 'EmployeeManagement' && (
-                  <EmployeeManagement 
-                    employees={getFilteredEmployees()}
-                    userRole={user.role}
-                    accessLevel={getAccessLevelText()}
-                    userDepartment={getUserDepartment()}
-                    canEdit={true}
-                    canDelete={user.role !== 'Manager'}
-                    canAdd={true}
-                    onUpdateEmployee={handleUpdateEmployee}
-                    onAddEmployee={handleAddEmployee}
-                    onDeleteEmployee={handleDeleteEmployee}
-                    onImportComplete={fetchEmployees}
-                  />
-                )}
-                {activeMenu === 'TeamReports' && <CEOTeamReports userRole={user.role} department={getUserDepartment()} user={user} />}
-                {activeMenu === 'LeaveManagement' && (
-                  <LeaveManagement 
-                    user={user}
-                    userRole={user.role}
-                    userDepartment={user.department}
-                  />
-                )}
-                {activeMenu === 'Automation' && <AutomationDashboard user={user} userRole={user.role} />}
-                {activeMenu === 'ResourceAllocation' && <ResourceAllocation userRole={user.role} />}
-                {activeMenu === 'Attendance' && <AttendanceView userRole={user.role} />}
-                {activeMenu === 'Meetings' && <Meetings userRole={user.role} />}
-                {activeMenu === 'AIInsights' && <AIInsights userRole={user.role} />}
-                {activeMenu === 'Notifications' && <Notifications userRole={user.role} />}
-                {activeMenu === 'ActivityMonitor' && <ActivityMonitor userRole={user.role} />}
-              </div>
-            </main>
+      <main className="grid min-h-dvh place-items-center bg-base-200 p-4">
+        <section className="card w-full max-w-md border border-base-300 bg-base-100">
+          <div className="card-body">
+            <h1 className="card-title">Change your temporary password</h1>
+            <ChangePasswordForm onChanged={handleLogout} />
+            <button type="button" className="btn btn-ghost self-start" onClick={handleLogout}>Sign out</button>
           </div>
-          <SessionManager user={user} onSessionExpired={handleSessionExpired} />
-        </div>
-      </ProtectedRoute>
+        </section>
+      </main>
     );
   }
 
-  // ==================== MANAGER / COO DASHBOARD ====================
-  if (user.role === 'Manager' || user.role === 'COO') {
-    const isCOO = user.role === 'COO';
-    const managerFeatureRole = 'Manager';
-    const managerDisplayRole = user.role;
-    const DashboardComponent = isCOO ? COODashboard : ManagerDashboard;
-    const TaskManagementComponent = isCOO ? COOTaskManagement : ManagerTaskManagement;
-    const ProjectsComponent = isCOO ? COOProjects : ManagerProjects;
-    const TeamsAndRolesComponent = isCOO ? COOTeamsAndRoles : ManagerTeamsAndRoles;
-    const AccountsComponent = isCOO ? COOAccounts : ManagerAccounts;
-    const EmployeeManagementComponent = isCOO ? COOEmployeeManagement : EmployeeManagement;
-    const TeamReportsComponent = isCOO ? COOTeamReports : ManagerTeamReports;
-    const AutomationDashboardComponent = isCOO ? COOAutomationDashboard : ManagerAutomationDashboard;
-    const AttendanceViewComponent = isCOO ? COOAttendanceView : ManagerAttendanceView;
-    const MeetingsComponent = isCOO ? COOMeetings : ManagerMeetings;
-    const AIInsightsComponent = isCOO ? COOAIInsights : ManagerAIInsights;
-    const NotificationsComponent = isCOO ? COONotifications : ManagerNotifications;
-    const ActivityMonitorComponent = isCOO ? COOActivityMonitor : ManagerActivityMonitor;
-
-    return (
-      <ProtectedRoute user={user} requiredRoles={['Manager', 'COO']}>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-          <ShiftTimer user={user} onLogout={handleLogout} onTimeZoneChange={handleTimeZoneChange}
-            navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(open => !open)} />
-          <div className="flex flex-1">
-            <aside className={`fixed bottom-0 left-0 top-[88px] md:top-[73px] z-40 flex w-64 flex-col overflow-y-auto border-r border-base-300 bg-base-100 ${navigationOpen ? '' : 'max-md:hidden'}`}>
-              <div className="p-6 border-b border-gray-200 flex justify-center">
-                <img src={spacebornLogo} alt="Spaceborn" className="h-16 w-auto object-contain" />
-              </div>
-              <div className="px-4 py-3 border-b border-gray-100">
-                <span className="badge badge-outline">{roleLabel(user.role)}</span>
-              </div>
-              <nav aria-label="Dashboard navigation" onClick={event => { if (event.target.closest('button')) setNavigationOpen(false); }} className="flex-1 p-4 overflow-y-auto">
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('Dashboard')} aria-current={managerActiveMenu === 'Dashboard' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Dashboard' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconHome className="w-5 h-5" />
-                      <span className="text-sm font-medium">Dashboard</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('TaskManagement')} aria-current={managerActiveMenu === 'TaskManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'TaskManagement' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconTasks className="w-5 h-5" />
-                      <span className="text-sm font-medium">Task Management</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('Projects')} aria-current={managerActiveMenu === 'Projects' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Projects' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBriefcase className="w-5 h-5" />
-                      <span className="text-sm font-medium">Projects</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('TeamsAndRoles')} aria-current={managerActiveMenu === 'TeamsAndRoles' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'TeamsAndRoles' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUsers className="w-5 h-5" />
-                      <span className="text-sm font-medium">Teams & Roles</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('ResourceAllocation')} aria-current={managerActiveMenu === 'ResourceAllocation' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'ResourceAllocation' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                        <IconInbox className="w-5 h-5" />
-                      <span className="text-sm font-medium">Resource Allocation</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('Accounts')} aria-current={managerActiveMenu === 'Accounts' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Accounts' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUser className="w-5 h-5" />
-                      <span className="text-sm font-medium">Accounts</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('EmployeeManagement')} aria-current={managerActiveMenu === 'EmployeeManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'EmployeeManagement' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUser className="w-5 h-5" />
-                      <span className="text-sm font-medium">Employee Database</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('TeamReports')} aria-current={managerActiveMenu === 'TeamReports' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'TeamReports' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconFileText className="w-5 h-5" />
-                      <span className="text-sm font-medium">Team Reports & MVP Roadmaps</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('LeaveManagement')} aria-current={managerActiveMenu === 'LeaveManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'LeaveManagement' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Leave Management</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('Automation')} aria-current={managerActiveMenu === 'Automation' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Automation' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconZap className="w-5 h-5" />
-                      <span className="text-sm font-medium">Team Automation</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('Attendance')} aria-current={managerActiveMenu === 'Attendance' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Attendance' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconClock className="w-5 h-5" />
-                      <span className="text-sm font-medium">Attendance</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('Meetings')} aria-current={managerActiveMenu === 'Meetings' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Meetings' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Meetings</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('AIInsights')} aria-current={managerActiveMenu === 'AIInsights' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'AIInsights' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconIdea className="w-5 h-5" />
-                      <span className="text-sm font-medium">AI Insights</span>
-                    </button>
-                    <button onClick={() => setManagerActiveMenu('Notifications')} aria-current={managerActiveMenu === 'Notifications' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'Notifications' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBell className="w-5 h-5" />
-                      <span className="text-sm font-medium">Notifications</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setManagerActiveMenu('ActivityMonitor')} aria-current={managerActiveMenu === 'ActivityMonitor' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${managerActiveMenu === 'ActivityMonitor' ? 'bg-blue-50 text-blue-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBarChart3 className="w-5 h-5" />
-                      <span className="text-sm font-medium">Activity Monitor</span>
-                    </button>
-                  </div>
-                </div>
-              </nav>
-              <div className="p-4 border-t border-gray-200">
-                <LogoutButton onLogout={handleLogout} />
-              </div>
-            </aside>
-            <main className="min-w-0 flex-1 overflow-y-auto md:ml-64">
-              <div className="p-4 sm:p-8">
-                {managerActiveMenu === 'Dashboard' && <DashboardComponent user={user} onLogout={handleLogout} />}
-                {managerActiveMenu === 'TaskManagement' && <TaskManagementComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'Projects' && <ProjectsComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'TeamsAndRoles' && <TeamsAndRolesComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'ResourceAllocation' && (isCOO ? <COOResourceAllocation userRole={managerFeatureRole} /> : <ResourceReview />)}
-                {managerActiveMenu === 'Accounts' && <AccountsComponent userRole={managerDisplayRole} />}
-                {managerActiveMenu === 'EmployeeManagement' && (
-                  <EmployeeManagementComponent 
-                    employees={getFilteredEmployees()}
-                    userRole={user.role}
-                    accessLevel={getAccessLevelText()}
-                    userDepartment={getUserDepartment()}
-                    canEdit={true}
-                    canDelete={user.role !== 'Manager'}
-                    canAdd={true}
-                    onUpdateEmployee={handleUpdateEmployee}
-                    onAddEmployee={handleAddEmployee}
-                    onDeleteEmployee={handleDeleteEmployee}
-                    onImportComplete={fetchEmployees}
-                  />
-                )}
-                {managerActiveMenu === 'TeamReports' && <TeamReportsComponent userRole={managerDisplayRole} department={null} user={user} />}
-                {managerActiveMenu === 'LeaveManagement' && (
-                  <LeaveManagement 
-                    user={user}
-                    userRole={managerDisplayRole}
-                    userDepartment={null}
-                  />
-                )}
-                {managerActiveMenu === 'Automation' && <AutomationDashboardComponent user={user} userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'Attendance' && <AttendanceViewComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'Meetings' && <MeetingsComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'AIInsights' && <AIInsightsComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'Notifications' && <NotificationsComponent userRole={managerFeatureRole} />}
-                {managerActiveMenu === 'ActivityMonitor' && <ActivityMonitorComponent userRole={managerFeatureRole} />}
-              </div>
-            </main>
-          </div>
-          <SessionManager user={user} onSessionExpired={handleSessionExpired} />
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // ==================== TEAM LEAD DASHBOARD ====================
-  if (user.role === 'Team Lead' || user.role === 'Co-Head' || user.role === 'CO Head') {
-    return (
-      <ProtectedRoute user={user} requiredRoles={['Team Lead', 'Co-Head', 'CO Head']}>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-          <ShiftTimer user={user} onLogout={handleLogout} onTimeZoneChange={handleTimeZoneChange}
-            navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(open => !open)} />
-          <div className="flex flex-1">
-            <aside className={`fixed bottom-0 left-0 top-[88px] md:top-[73px] z-40 flex w-64 flex-col overflow-y-auto border-r border-base-300 bg-base-100 ${navigationOpen ? '' : 'max-md:hidden'}`}>
-              <div className="p-6 border-b border-gray-200 flex justify-center">
-                <img src={spacebornLogo} alt="Spaceborn" className="h-16 w-auto object-contain" />
-              </div>
-              <div className="px-4 py-3 border-b border-gray-100">
-                <span className="badge badge-outline">{roleLabel(user.role)}</span>
-              </div>
-              <nav aria-label="Dashboard navigation" onClick={event => { if (event.target.closest('button')) setNavigationOpen(false); }} className="flex-1 p-4 overflow-y-auto">
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setTeamLeadActiveMenu('Dashboard')} aria-current={teamLeadActiveMenu === 'Dashboard' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'Dashboard' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconHome className="w-5 h-5" />
-                      <span className="text-sm font-medium">Dashboard</span>
-                    </button>
-                    <button onClick={() => setTeamLeadActiveMenu('TaskManagement')} aria-current={teamLeadActiveMenu === 'TaskManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'TaskManagement' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconTasks className="w-5 h-5" />
-                      <span className="text-sm font-medium">Task Management</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setTeamLeadActiveMenu('TeamsAndRoles')} aria-current={teamLeadActiveMenu === 'TeamsAndRoles' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'TeamsAndRoles' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUsers className="w-5 h-5" />
-                      <span className="text-sm font-medium">Teams & Roles</span>
-                    </button>
-                    {user.role === 'Team Lead' && (
-                      <button type="button" className={`btn btn-sm w-full justify-start ${teamLeadActiveMenu === 'EmployeeAccess' ? 'btn-active' : 'btn-ghost'}`}
-                        onClick={() => setTeamLeadActiveMenu('EmployeeAccess')}><IconLock className="h-5 w-5" /> Employee access</button>
-                    )}
-                    <button onClick={() => setTeamLeadActiveMenu('Resources')} aria-current={teamLeadActiveMenu === 'Resources' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'Resources' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconInbox className="w-5 h-5" />
-                      <span className="text-sm font-medium">Resources</span>
-                    </button>
-                    <button onClick={() => setTeamLeadActiveMenu('MVPRoadmap')} aria-current={teamLeadActiveMenu === 'MVPRoadmap' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'MVPRoadmap' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBarChart3 className="w-5 h-5" />
-                      <span className="text-sm font-medium">MVP Roadmap</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setTeamLeadActiveMenu('Meetings')} aria-current={teamLeadActiveMenu === 'Meetings' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'Meetings' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Meetings</span>
-                    </button>
-                    <button onClick={() => setTeamLeadActiveMenu('Notifications')} aria-current={teamLeadActiveMenu === 'Notifications' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'Notifications' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBell className="w-5 h-5" />
-                      <span className="text-sm font-medium">Notifications</span>
-                    </button>
-                    <button onClick={() => setTeamLeadActiveMenu('LeaveManagement')} aria-current={teamLeadActiveMenu === 'LeaveManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${teamLeadActiveMenu === 'LeaveManagement' ? 'bg-green-50 text-green-600' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Leave & Breaks</span>
-                    </button>
-                  </div>
-                </div>
-              </nav>
-              <div className="p-4 border-t border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-semibold">
-                    {user.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{roleLabel(user.role)} · {getUserDepartment()}</p>
-                  </div>
-                  <LogoutButton onLogout={handleLogout} />
-                </div>
-              </div>
-            </aside>
-            <main className="min-w-0 flex-1 overflow-y-auto md:ml-64">
-              <div className="p-4 sm:p-8">
-                {teamLeadActiveMenu === 'Dashboard' && <TeamLeadDashboard user={user} onLogout={handleLogout} />}
-                {teamLeadActiveMenu === 'TaskManagement' && <TeamLeadTaskManagement userRole={user.role} />}
-                {teamLeadActiveMenu === 'TeamsAndRoles' && <TeamLeadTeamsAndRoles userRole={user.role} />}
-                {teamLeadActiveMenu === 'EmployeeAccess' && user.role === 'Team Lead' && <EmployeeAccess />}
-                {teamLeadActiveMenu === 'Resources' && <>
-                  {user.role === 'Team Lead' && <ResourceReview />}
-                  <TeamLeadResources userRole={user.role} />
-                </>}
-                {teamLeadActiveMenu === 'MVPRoadmap' && <MVPRoadmap userRole={user.role} />}
-                {teamLeadActiveMenu === 'Meetings' && <TeamLeadMeetings userRole={user.role} />}
-                {teamLeadActiveMenu === 'Notifications' && <TeamLeadNotifications userRole={user.role} />}
-                {teamLeadActiveMenu === 'LeaveManagement' && (
-                  <LeaveManagement 
-                    user={user}
-                    userRole={user.role}
-                    userDepartment={user.department}
-                  />
-                )}
-              </div>
-            </main>
-          </div>
-          <SessionManager user={user} onSessionExpired={handleSessionExpired} />
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  // ==================== MEMBER DASHBOARD ====================
-  if (['Member', 'HR', 'Coordinator'].includes(user.role)) {
-    const memberData = user;
-    
-    return (
-      <ProtectedRoute user={user} requiredRoles={['Member', 'HR', 'Coordinator']}>
-        <div className="min-h-screen bg-gray-50 flex flex-col">
-          <ShiftTimer user={user} onLogout={handleLogout} onTimeZoneChange={handleTimeZoneChange}
-            navigationOpen={navigationOpen} onToggleNavigation={() => setNavigationOpen(open => !open)} />
-          <div className="flex flex-1">
-            <aside className={`fixed bottom-0 left-0 top-[88px] md:top-[73px] z-40 flex w-64 flex-col overflow-y-auto border-r border-base-300 bg-base-100 ${navigationOpen ? '' : 'max-md:hidden'}`}>
-              <div className="p-6 border-b border-gray-200 flex justify-center">
-                <img src={spacebornLogo} alt="Spaceborn" className="h-16 w-auto object-contain" />
-              </div>
-              <div className="px-4 py-3 border-b border-gray-100">
-                <span className="badge badge-outline">{roleLabel(user.role)}</span>
-              </div>
-              <nav aria-label="Dashboard navigation" onClick={event => { if (event.target.closest('button')) setNavigationOpen(false); }} className="flex-1 p-4 overflow-y-auto">
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setMemberActiveMenu('Dashboard')} aria-current={memberActiveMenu === 'Dashboard' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'Dashboard' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconHome className="w-5 h-5" />
-                      <span className="text-sm font-medium">Dashboard</span>
-                    </button>
-                    <button onClick={() => setMemberActiveMenu('MyProfile')} aria-current={memberActiveMenu === 'MyProfile' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'MyProfile' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconUser className="w-5 h-5" />
-                      <span className="text-sm font-medium">My Profile</span>
-                    </button>
-                    {user.role === 'Member' && (
-                      <button type="button" onClick={() => setMemberActiveMenu('MyTeam')} aria-current={memberActiveMenu === 'MyTeam' ? 'page' : undefined}
-                        className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'MyTeam' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                        <IconUsers className="w-5 h-5" />
-                        <span className="text-sm font-medium">My Team</span>
-                      </button>
-                    )}
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setMemberActiveMenu('DailyReport')} aria-current={memberActiveMenu === 'DailyReport' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'DailyReport' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconFileText className="w-5 h-5" />
-                      <span className="text-sm font-medium">Daily Report</span>
-                    </button>
-                    <button onClick={() => setMemberActiveMenu('Leave')} aria-current={memberActiveMenu === 'Leave' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'Leave' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Leave</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setMemberActiveMenu('TaskManagement')} aria-current={memberActiveMenu === 'TaskManagement' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'TaskManagement' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconTasks className="w-5 h-5" />
-                      <span className="text-sm font-medium">My Tasks</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    {['HR', 'Coordinator'].includes(user.role) && (
-                      <button type="button" className={`btn btn-sm w-full justify-start ${memberActiveMenu === 'EmployeeAccess' ? 'btn-active' : 'btn-ghost'}`}
-                        onClick={() => setMemberActiveMenu('EmployeeAccess')}><IconLock className="h-5 w-5" /> Employee access</button>
-                    )}
-                    <button onClick={() => setMemberActiveMenu('Resources')} aria-current={memberActiveMenu === 'Resources' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'Resources' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconInbox className="w-5 h-5" />
-                      <span className="text-sm font-medium">Resources</span>
-                    </button>
-                  </div>
-                </div>
-                <div className="mb-6">
-                  <div className="space-y-1">
-                    <button onClick={() => setMemberActiveMenu('Meetings')} aria-current={memberActiveMenu === 'Meetings' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'Meetings' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconCalendar className="w-5 h-5" />
-                      <span className="text-sm font-medium">Meetings</span>
-                    </button>
-                    <button onClick={() => setMemberActiveMenu('Notifications')} aria-current={memberActiveMenu === 'Notifications' ? 'page' : undefined} className={`btn btn-ghost btn-sm w-full justify-start gap-3 px-3 text-left ${memberActiveMenu === 'Notifications' ? 'bg-gray-100 text-black' : 'text-gray-700 hover:bg-gray-100'}`}>
-                      <IconBell className="w-5 h-5" />
-                      <span className="text-sm font-medium">Notifications</span>
-                    </button>
-                  </div>
-                </div>
-              </nav>
-              <div className="p-4 border-t border-gray-200">
-                <div className="flex items-center space-x-3">
-                  <div className="w-10 h-10 bg-black rounded-full flex items-center justify-center text-white font-semibold">
-                    {user.name?.split(' ').map(n => n[0]).join('') || 'U'}
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-gray-900">{user.name}</p>
-                    <p className="text-xs text-gray-500">{roleLabel(user.role)} · {user.department}</p>
-                  </div>
-                  <LogoutButton onLogout={handleLogout} />
-                </div>
-              </div>
-            </aside>
-            <main className="min-w-0 flex-1 overflow-y-auto md:ml-64">
-              <div className="p-4 sm:p-8">
-                {memberActiveMenu === 'Dashboard' && <MemberDashboard user={user} onLogout={handleLogout} />}
-                {memberActiveMenu === 'MyTeam' && <MyTeam />}
-                {memberActiveMenu === 'MyProfile' && memberData && (
-                  <MemberProfileView 
-                    userData={memberData}
-                    onUpdate={handleUpdateEmployee}
-                  />
-                )}
-                {memberActiveMenu === 'DailyReport' && (
-                  <DailyWorkReport 
-                    user={user}
-                    onReportSubmitted={() => console.log('Report submitted')}
-                  />
-                )}
-                {memberActiveMenu === 'Leave' && (
-                  <LeaveManagement 
-                    user={user}
-                    userRole={user.role}
-                    userDepartment={user.department}
-                  />
-                )}
-                {memberActiveMenu === 'TaskManagement' && <MemberTaskManagement userRole={user.role} />}
-                {memberActiveMenu === 'EmployeeAccess' && ['HR', 'Coordinator'].includes(user.role) && <EmployeeAccess />}
-                {memberActiveMenu === 'Resources' && <>
-                  {['HR', 'Coordinator'].includes(user.role) && <ResourceReview />}
-                  <MemberResources userRole={user.role} />
-                </>}
-                {memberActiveMenu === 'Meetings' && <MemberMeetings userRole={user.role} />}
-                {memberActiveMenu === 'Notifications' && <MemberNotifications userRole={user.role} />}
-              </div>
-            </main>
-          </div>
-          <SessionManager user={user} onSessionExpired={handleSessionExpired} />
-        </div>
-      </ProtectedRoute>
-    );
-  }
-
-  return null;
+  return (
+    <div className="flex h-dvh flex-col overflow-hidden bg-base-200">
+      <ShiftTimer user={user} onLogout={handleLogout} navigationOpen={navigationOpen}
+        onToggleNavigation={() => setNavigationOpen(open => !open)} />
+      <div className="relative flex min-h-0 flex-1">
+        <DashboardNavigation user={user} active={activeMenu} open={navigationOpen}
+          onNavigate={navigate} onLogout={handleLogout} />
+        <main className="min-w-0 flex-1 overflow-y-auto p-4 sm:p-8">
+          {renderSection()}
+        </main>
+      </div>
+      <SessionManager user={user} onSessionExpired={clearWorkspace} />
+    </div>
+  );
 }
 
 export default App;

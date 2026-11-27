@@ -88,14 +88,36 @@ async function connectDB() {
   }
 
   await exec(`
+    CREATE TABLE IF NOT EXISTS employee_id_counters (
+      prefix TEXT PRIMARY KEY,
+      last_value BIGINT NOT NULL CHECK (last_value >= 0)
+    );
+    CREATE TABLE IF NOT EXISTS report_submission_archive (LIKE reports INCLUDING ALL);
+    WITH ranked AS (
+      SELECT id, data, created_at, updated_at,
+        ROW_NUMBER() OVER (
+          PARTITION BY data->>'userId', data->>'date'
+          ORDER BY updated_at DESC NULLS LAST, created_at DESC NULLS LAST, id DESC
+        ) AS ordinal
+      FROM reports
+      WHERE data->>'userId' IS NOT NULL AND data->>'date' IS NOT NULL
+    ), archived AS (
+      INSERT INTO report_submission_archive (id, data, created_at, updated_at)
+      SELECT id, data, created_at, updated_at FROM ranked WHERE ordinal > 1
+      ON CONFLICT (id) DO UPDATE SET data = EXCLUDED.data
+      RETURNING id
+    )
+    DELETE FROM reports WHERE id IN (SELECT id FROM archived);
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_reports_user_date
+      ON reports ((data->>'userId'), (data->>'date'));
     ALTER TABLE users
+      ADD COLUMN IF NOT EXISTS two_factor JSONB,
       ADD COLUMN IF NOT EXISTS password_reset_digest TEXT,
       ADD COLUMN IF NOT EXISTS password_reset_expires_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS password_reset_requested_at TIMESTAMPTZ,
       ADD COLUMN IF NOT EXISTS password_reset_identity JSONB;
     CREATE UNIQUE INDEX IF NOT EXISTS idx_users_password_reset_digest ON users (password_reset_digest)
       WHERE password_reset_digest IS NOT NULL;
-    CREATE SEQUENCE IF NOT EXISTS signup_employee_ids;
     CREATE TABLE IF NOT EXISTS signup_requests (
       id TEXT PRIMARY KEY,
       email TEXT UNIQUE NOT NULL,

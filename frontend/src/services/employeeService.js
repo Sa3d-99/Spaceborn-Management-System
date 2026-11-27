@@ -7,34 +7,11 @@ class EmployeeService {
     this.cache = new Map();
     this.cacheTimeout = 5 * 60 * 1000; // 5 minutes cache
     this.API_BASE_URL = process.env.REACT_APP_API_URL || '/api';
-    this.useMockData = process.env.REACT_APP_USE_MOCK_AUTH === 'true';
-  }
-
-  // Mock data for development
-  getMockEmployees() {
-    return [
-      { id: 1, name: 'John Doe', role: 'CEO', department: 'Platform and DevOps', email: '', employeeId: 'CEO001', phone: '+1 (555) 000-0001', joinDate: '2020-01-15', status: 'Active', manager: 'N/A' },
-      { id: 2, name: 'Jane Smith', role: 'Manager', department: 'Platform and DevOps', email: 'jane.smith@spaceborn.com', employeeId: 'MGR001', phone: '+1 (555) 000-0002', joinDate: '2020-03-20', status: 'Active', manager: 'John Doe' },
-      { id: 3, name: 'Mike Johnson', role: 'Team Lead', department: 'Core Systems', email: 'mike.johnson@spaceborn.com', employeeId: 'LD001', phone: '+1 (555) 000-0003', joinDate: '2021-02-10', status: 'Active', manager: 'Jane Smith' },
-      { id: 4, name: 'Ravi Das', role: 'Member', department: 'Core Systems', email: 'ravi.das@spaceborn.com', employeeId: 'EMP001', phone: '+1 (555) 000-0004', joinDate: '2022-06-01', status: 'Active', manager: 'Mike Johnson' },
-      { id: 5, name: 'Priya Sharma', role: 'Member', department: 'Core Systems', email: 'priya.sharma@spaceborn.com', employeeId: 'EMP002', phone: '+1 (555) 000-0005', joinDate: '2022-08-15', status: 'Active', manager: 'Mike Johnson' },
-      { id: 6, name: 'Sita Krishnan', role: 'Member', department: 'AI/LLM & Perception', email: 'sita.krishnan@spaceborn.com', employeeId: 'EMP003', phone: '+1 (555) 000-0006', joinDate: '2023-01-10', status: 'Active', manager: 'Jane Smith' },
-      { id: 7, name: 'Anil Mehta', role: 'Member', department: 'Hardware & Integration', email: 'anil.mehta@spaceborn.com', employeeId: 'EMP004', phone: '+1 (555) 000-0007', joinDate: '2023-03-15', status: 'Active', manager: 'Jane Smith' },
-      { id: 8, name: 'Sarah Williams', role: 'Team Lead', department: 'Robotics & Simulation', email: 'sarah.williams@spaceborn.com', employeeId: 'LD002', phone: '+1 (555) 000-0008', joinDate: '2021-05-20', status: 'Active', manager: 'Jane Smith' },
-      { id: 9, name: 'David Brown', role: 'Member', department: 'Robotics & Simulation', email: 'david.brown@spaceborn.com', employeeId: 'EMP005', phone: '+1 (555) 000-0009', joinDate: '2022-09-01', status: 'Active', manager: 'Sarah Williams' },
-      { id: 10, name: 'Emily Davis', role: 'Member', department: 'Robotics & Simulation', email: 'emily.davis@spaceborn.com', employeeId: 'EMP006', phone: '+1 (555) 000-0010', joinDate: '2023-03-15', status: 'Active', manager: 'Sarah Williams' },
-      { id: 11, name: 'Alex Chen', role: 'Member', department: 'Core Systems', email: 'alex.chen@spaceborn.com', employeeId: 'EMP007', phone: '+1 (555) 000-0011', joinDate: '2023-01-10', status: 'Active', manager: 'Mike Johnson' },
-      { id: 12, name: 'Nisha Kumar', role: 'Member', department: 'Platform and DevOps', email: 'nisha.kumar@spaceborn.com', employeeId: 'EMP008', phone: '+1 (555) 000-0012', joinDate: '2022-11-15', status: 'Active', manager: 'Jane Smith' }
-    ];
-  }
-
-  getMockDepartments() {
-    return DEPARTMENTS;
   }
 
   // Helper method to get cached data
   getCached(key) {
-    const cached = this.cache.get(key);
+    const cached = this.cache.get(`${authService.getToken()}:${key}`);
     if (cached && Date.now() - cached.timestamp < this.cacheTimeout) {
       return cached.data;
     }
@@ -43,130 +20,36 @@ class EmployeeService {
 
   // Helper method to set cached data
   setCached(key, data) {
-    this.cache.set(key, { data, timestamp: Date.now() });
+    this.cache.set(`${authService.getToken()}:${key}`, { data, timestamp: Date.now() });
   }
 
   // Clear specific cache or all cache
   clearCache(key = null) {
     if (key) {
-      this.cache.delete(key);
+      this.cache.delete(`${authService.getToken()}:${key}`);
     } else {
       this.cache.clear();
     }
   }
 
-  // Generic API request method with mock fallback
   async apiRequest(endpoint, options = {}) {
-    // If using mock data, return mock responses
-    if (this.useMockData) {
-      console.log(`[MOCK] API Request to ${endpoint}`);
-      return this.getMockResponse(endpoint, options);
-    }
-
     const token = authService.getToken();
-    const headers = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      ...(token && { 'Authorization': `Bearer ${token}` }),
-      ...options.headers
-    };
-
-    const config = {
+    const response = await fetch(`${this.API_BASE_URL}${endpoint}`, {
       ...options,
-      headers
-    };
-
-    try {
-      const response = await fetch(`${this.API_BASE_URL}${endpoint}`, config);
-      
-      if (response.status === 401) {
-        authService.clearSession();
-        window.location.href = '/login';
-        throw new Error('Session expired. Please login again.');
+      headers: {
+        Accept: 'application/json',
+        ...(typeof options.body === 'string' && { 'Content-Type': 'application/json' }),
+        ...(token && { Authorization: `Bearer ${token}` }),
+        ...options.headers
       }
-
-      if (response.status === 204) {
-        return null;
-      }
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || `Request failed with status ${response.status}`);
-      }
-      
-      return normalizeDepartmentFields(data?.data ?? data?.employees ?? data);
-    } catch (error) {
-      console.error(`API Error (${endpoint}):`, error);
-      // Fallback to mock data on error
-      return this.getMockResponse(endpoint, options);
+    });
+    if (response.status === 401) authService.clearSession();
+    if (response.status === 204) return null;
+    const data = await response.json().catch(() => ({}));
+    if (!response.ok || data.success === false) {
+      throw new Error(data.message || `Request failed with status ${response.status}`);
     }
-  }
-
-  // Get mock response based on endpoint
-  getMockResponse(endpoint, options) {
-    const employees = this.getMockEmployees();
-    const departments = this.getMockDepartments();
-
-    if (endpoint === '/employees' || endpoint.startsWith('/employees?')) {
-      return employees;
-    }
-    
-    if (endpoint.includes('/employees/departments')) {
-      return departments;
-    }
-    
-    if (endpoint.includes('/employees/stats')) {
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-      
-      return {
-        total: employees.length,
-        active: employees.filter(e => e.status === 'Active').length,
-        departments: departments.length,
-        newThisMonth: employees.filter(e => {
-          const joinDate = new Date(e.joinDate);
-          return joinDate.getMonth() === currentMonth && joinDate.getFullYear() === currentYear;
-        }).length,
-        departmentList: departments,
-        roleDistribution: [
-          { role: 'CEO', count: employees.filter(e => e.role === 'CEO').length },
-          { role: 'Manager', count: employees.filter(e => e.role === 'Manager').length },
-          { role: 'Team Lead', count: employees.filter(e => e.role === 'Team Lead').length },
-          { role: 'Member', count: employees.filter(e => e.role === 'Member').length }
-        ]
-      };
-    }
-    
-    if (endpoint.includes('/employees/department/')) {
-      const dept = endpoint.split('/department/')[1];
-      return employees.filter(e => e.department === decodeURIComponent(dept));
-    }
-    
-    if (endpoint.includes('/employees/role/')) {
-      const role = endpoint.split('/role/')[1];
-      return employees.filter(e => e.role === role);
-    }
-    
-    if (endpoint.match(/\/employees\/\d+$/)) {
-      const id = parseInt(endpoint.split('/').pop());
-      return employees.find(e => e.id === id) || null;
-    }
-    
-    if (options.method === 'POST' && endpoint === '/employees') {
-      const body = JSON.parse(options.body);
-      const newEmployee = { id: employees.length + 1, ...body };
-      return newEmployee;
-    }
-    
-    if (options.method === 'PUT' && endpoint.includes('/employees/')) {
-      const id = parseInt(endpoint.split('/').pop());
-      const body = JSON.parse(options.body);
-      return { id, ...body };
-    }
-    
-    return employees;
+    return normalizeDepartmentFields(data?.data ?? data?.employees ?? data);
   }
 
   // ==================== EMPLOYEE CRUD OPERATIONS ====================
@@ -228,24 +111,13 @@ class EmployeeService {
   }
 
   async createEmployee(employeeData) {
-    if (!employeeData || !employeeData.name || !employeeData.email || !employeeData.role) {
+    if (!employeeData || !(employeeData.name || (employeeData.firstName && employeeData.lastName)) || !employeeData.email || !employeeData.role) {
       throw new Error('Name, email, and role are required');
     }
     
     const data = await this.apiRequest('/employees', {
       method: 'POST',
-      body: JSON.stringify({
-        ...employeeData,
-        createdAt: new Date().toISOString(),
-        status: employeeData.status || 'Active',
-        leaveBalance: employeeData.leaveBalance || {
-          Sick: 12,
-          Casual: 10,
-          Annual: 15,
-          Emergency: 5,
-          Other: 3
-        }
-      })
+      body: JSON.stringify(employeeData)
     });
     
     this.clearCache();
@@ -256,25 +128,21 @@ class EmployeeService {
     return this.createEmployee(employeeData);
   }
 
-  // Bulk import employees from spreadsheet rows.
-  // Calls the API directly (no mock fallback) so failures are never hidden.
-  async importEmployees(rows, { dryRun = true, updateExisting = false } = {}) {
-    const token = authService.getToken();
-    const response = await fetch(`${this.API_BASE_URL}/employees/import`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Accept: 'application/json',
-        ...(token && { Authorization: `Bearer ${token}` })
-      },
-      body: JSON.stringify({ rows, dryRun, updateExisting })
-    });
-    const data = await response.json().catch(() => ({}));
-    if (!response.ok || data.success === false) {
-      throw new Error(data.message || `Import failed (status ${response.status})`);
-    }
+  async importEmployees(file, { sheet, dryRun = true, updateExisting = false } = {}) {
+    const body = new FormData();
+    body.append('file', file);
+    if (sheet) body.append('sheet', sheet);
+    body.append('dryRun', String(dryRun));
+    body.append('updateExisting', String(updateExisting));
+    const result = await this.apiRequest('/employees/import', { method: 'POST', body });
     if (!dryRun) this.clearCache();
-    return data.data;
+    return result;
+  }
+
+  async accountAction(id, action) {
+    const result = await this.apiRequest(`/users/${encodeURIComponent(id)}/${action}`, { method: 'POST' });
+    this.clearCache();
+    return result;
   }
 
   async updateEmployee(id, employeeData) {
@@ -480,14 +348,9 @@ class EmployeeService {
     const cached = this.getCached(cacheKey);
     if (cached) return cached;
     
-    try {
-      const data = await this.apiRequest(`/employees/${employeeId}/leave-balance`);
-      this.setCached(cacheKey, data);
-      return data;
-    } catch (error) {
-      const defaultBalance = { Sick: 12, Casual: 10, Annual: 15, Emergency: 5, Other: 3 };
-      return defaultBalance;
-    }
+    const data = await this.apiRequest(`/employees/${employeeId}/leave-balance`);
+    this.setCached(cacheKey, data);
+    return data;
   }
 
   async updateLeaveBalance(employeeId, leaveType, days) {

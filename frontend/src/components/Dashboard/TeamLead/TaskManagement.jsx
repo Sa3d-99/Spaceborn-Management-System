@@ -8,6 +8,7 @@ import React, { useState, useEffect } from 'react';
 import authService from '../../../services/authService';
 import taskService from '../../../services/taskService';
 import userService from '../../../services/userService';
+import { roleLabel } from '../../../utils/roleLabels';
 import {
   calculateTaskStats,
   deriveStatusFromProgress,
@@ -555,7 +556,7 @@ const TaskManagement = ({ userRole = 'Team Lead' }) => {
 
                       return membersForDept.map(member => (
                         <option key={member.id} value={member.id}>
-                          {member.name} ({member.role})
+                          {member.name} ({roleLabel(member.role)})
                         </option>
                       ));
                     })()}

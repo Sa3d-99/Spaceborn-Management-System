@@ -1,12 +1,25 @@
 const User = require('../models/User');
 const { formatResponse } = require('../utils/helpers');
 const { uploadEmployeeDocumentToDrive } = require('../services/googleDriveService');
-const { canTerminateUser, canAssignEmployeeRole, effectiveRole } = require('../utils/terminationPermissions');
-const { passwordError, generatePassword } = require('../utils/passwords');
+const { randomUUID } = require('node:crypto');
+const { canTerminateUser, canAssignEmployeeRole, canChangeEmployeeRole, effectiveRole } = require('../utils/terminationPermissions');
+const { validateEmployeeFields, cleanText } = require('../utils/employeeFields');
+const { businessDate } = require('../utils/businessTime');
+const { emailSettings } = require('../services/emailService');
+const { emailAdminResetLink } = require('../services/passwordResetService');
+const { extname } = require('node:path');
+const { readEmployeeWorkbook } = require('../services/employeeWorkbook');
+const { queueEmployeeSetupEmail } = require('../services/employeeSetupEmailService');
+const {
+  allocateEmployeeIds, withEmployeeIdentityLock, emailOwner,
+  newEmployee, insertEmployees, updateEmployees, removeEmployee
+} = require('../services/employeeDirectoryService');
+const Leave = require('../models/Leave');
+const LeaveBalance = require('../models/LeaveBalance');
 const { DEPARTMENTS, normalizeDepartment, normalizeDepartments } = require('../config/departments');
 
 const getFullName = (user) =>
-  user?.fullName || [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
+  user?.fullName || user?.name || [user?.firstName, user?.lastName].filter(Boolean).join(' ').trim();
 
 const buildDriveUrls = (fileId, webViewLink, webContentLink) => ({
   fileUrl: webContentLink || `https://drive.google.com/uc?export=download&id=${fileId}`,
@@ -76,9 +89,15 @@ const toEmployeeDto = (user) => {
     manager: plain.manager || '',
     managerId: plain.managerId,
     joinDate: plain.joinDate,
-    status: plain.isActive === false ? 'Inactive' : 'Active',
+    dateOfBirth: plain.dateOfBirth,
+    status: plain.isActive === false ? 'Inactive' : plain.onLeave ? 'On Leave' : 'Active',
+    employmentStatus: plain.isActive === false ? 'inactive' : plain.onLeave ? 'on-leave' : 'active',
+    isOnboarded: plain.isOnboarded ?? (!plain.mustChangePassword && Boolean(plain.passwordChangedAt || plain.lastLogin)),
+    ndaSigned: Boolean(plain.ndaSigned || plain.documents?.nda?.signed),
+    setupEmailStatus: !plain.passwordChangedAt ? plain.setupEmailStatus : undefined,
+    lastLogin: plain.lastLogin || plain.lastLoginAt,
     isActive: plain.isActive !== false,
-    isOnline: Boolean(plain.isOnline),
+    isOnline: plain.isActive !== false && Boolean(plain.isOnline),
     lastSeen: plain.lastSeen,
     terminatedAt: plain.terminatedAt,
     createdAt: plain.createdAt,
@@ -89,170 +108,117 @@ const toEmployeeDto = (user) => {
   return applyDocumentToDto(employee);
 };
 
-const splitName = (body) => {
-  if (body.firstName || body.lastName) {
-    return {
-      firstName: body.firstName,
-      lastName: body.lastName || body.firstName,
-    };
-  }
+const leadership = ['CEO', 'COO', 'Manager', 'HR'];
+const leadRoles = ['Team Lead', 'CO Head'];
+const scopesEmployee = (actor, target) => leadership.includes(actor.role) ||
+  (leadRoles.includes(actor.role) && normalizeDepartment(actor.department) === normalizeDepartment(target.department));
 
-  const parts = (body.name || '').trim().split(/\s+/).filter(Boolean);
-  return {
-    firstName: parts[0],
-    lastName: parts.slice(1).join(' ') || parts[0],
-  };
-};
+function employeeDirectoryError(res, error) {
+  const status = error.status || 500;
+  if (status === 500) console.error('Employee directory error:', error.code || error.message);
+  return res.status(status).json(formatResponse(false, status === 500 ? 'Could not complete the employee request.' : error.message));
+}
 
-const buildEmployeeQuery = (queryParams = {}, currentUser = null) => {
-  const { department, role, status, search } = queryParams;
+function readFilters(req) {
+  const { department, role, status, search } = req.query;
   const query = {};
-
-  if (department) query.department = normalizeDepartment(department);
-  if (role) query.role = role;
-  if (status) query.isActive = status === 'Active' || status === 'active';
-
-  if (currentUser?.role === 'Team Lead') {
-    query.department = normalizeDepartment(currentUser.department || department);
-    query.role = 'Member';
-    query.isActive = true;
+  if (department && !/^all$/i.test(department)) query.department = normalizeDepartment(department);
+  if (role && !/^all$/i.test(role)) query.role = role;
+  const name = cleanText(search);
+  if (typeof search !== 'undefined' && (typeof search !== 'string' || name.length > 100)) {
+    throw Object.assign(new Error('Search must be at most 100 characters.'), { status: 400 });
   }
-
-  if (search) {
-    query.$or = [
-      { firstName: { $regex: search, $options: 'i' } },
-      { lastName: { $regex: search, $options: 'i' } },
-      { fullName: { $regex: search, $options: 'i' } },
-      { employeeId: { $regex: search, $options: 'i' } },
-      { email: { $regex: search, $options: 'i' } }
-    ];
+  if (name) {
+    const literal = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    query.$or = ['firstName', 'lastName', 'fullName', 'employeeId', 'email']
+      .map(field => ({ [field]: { $regex: literal, $options: 'i' } }));
   }
+  return { query, status };
+}
 
-  return query;
-};
+function employeeActions(actor, target) {
+  const allowed = canTerminateUser(actor, target);
+  return { canDeactivate: allowed, canTerminate: allowed, canResetPassword: allowed };
+}
 
-// @desc    Create new employee (Manager/CEO only)
-// @route   POST /api/users/create
-// @access  Private (Manager, CEO)
+async function findReportingManager(user) {
+  const reference = String(user.manager || '').trim();
+  const manager = (user.managerId && await User.findById(user.managerId)) ||
+    (reference && await User.findOne({ $or: [
+      { employeeId: reference.toUpperCase() }, { email: reference.toLowerCase() },
+      { fullName: reference }
+    ] }));
+  return manager && { id: manager.id, name: getFullName(manager) };
+}
+
+async function employeeDetails(user, actor) {
+  const manager = await findReportingManager(user);
+  const leaveBalance = await currentLeaveBalance(user);
+  return {
+    ...toEmployeeDto(user), ...employeeActions(actor, user), leaveBalance,
+    manager: manager?.name || user.manager || '', managerId: manager?.id,
+  };
+}
+
+async function listEmployees(req, res) {
+  try {
+    const { query, status } = readFilters(req);
+    const date = businessDate();
+    const [employees, leaves] = await Promise.all([
+      User.find(query).sort({ createdAt: -1 }),
+      Leave.find({ startDate: { $lte: date }, endDate: { $gte: date }, status: 'Approved' })
+    ]);
+    const onLeave = new Set(leaves.flatMap(leave => [leave.userId, leave.employeeId]));
+    const data = employees.filter(user => scopesEmployee(req.user, user)).map(user => ({
+      ...toEmployeeDto({ ...user, onLeave: onLeave.has(user.id) || onLeave.has(user.employeeId) }),
+      ...employeeActions(req.user, user)
+    })).filter(user => !status || /^all$/i.test(status) || user.status.toLowerCase() === String(status).toLowerCase());
+
+    return res.json(formatResponse(true, 'Employees fetched successfully', data));
+  } catch (error) {
+    return employeeDirectoryError(res, error);
+  }
+}
+
 exports.createEmployee = async (req, res) => {
   try {
-    const { firstName, lastName } = splitName(req.body);
-    const { email, phone, role, department, team, manager, password, joinDate, designation } = req.body;
-
-    // Validate required fields
-    if (!firstName || !lastName || !email) {
-      return res.status(400).json(formatResponse(false, 'Name and email are required'));
-    }
-
-    // Check if email already exists
-    const existingEmail = await User.findOne({ email: email.toLowerCase() });
-    if (existingEmail) {
-      return res.status(400).json(formatResponse(false, 'Email already exists'));
-    }
-
-    const employeeRole = role || 'Member';
-    const employeeId = req.body.employeeId || await User.generateEmployeeId(employeeRole);
-    const initialPassword = password || generatePassword();
-    const policyError = passwordError(initialPassword);
-    if (policyError) return res.status(400).json(formatResponse(false, policyError));
-    if (!canAssignEmployeeRole(req.user.role, role || 'Member')) {
+    const body = req.body || {};
+    const { fields, errors } = validateEmployeeFields(body);
+    if (errors.length) return res.status(400).json(formatResponse(false, errors[0], errors));
+    if (!canAssignEmployeeRole(req.user.role, fields.role)) {
       return res.status(403).json(formatResponse(false, 'You cannot assign this role'));
     }
-
-    // Get the manager who is creating this employee
-    const createdByName = getFullName(req.user);
-
-    // Create employee
-    const user = await User.create({
-      employeeId,
-      password: initialPassword, // Will be hashed by pre-save middleware
-      firstName,
-      lastName,
-      email: email.toLowerCase(),
-      phone: phone || '',
-      role: employeeRole,
-      department: normalizeDepartment(department || 'Core Systems'),
-      designation: designation || employeeRole,
-      team: team || '',
-      manager: manager || createdByName,
-      joinDate: joinDate || new Date().toISOString().split('T')[0],
-      isActive: true,
-      createdBy: req.user?._id,
-      createdByName
+    const user = await withEmployeeIdentityLock(async client => {
+      if (await emailOwner(client, fields.email)) return null;
+      const [employeeId] = await allocateEmployeeIds(fields.role, 1, client);
+      const record = newEmployee({
+        ...fields, fullName: [fields.firstName, fields.lastName].join(' '),
+        team: cleanText(body.team), manager: cleanText(body.manager) || getFullName(req.user),
+        managerId: cleanText(body.managerId) || (cleanText(body.manager) ? undefined : req.user.id),
+        createdBy: req.user.id, createdByName: getFullName(req.user), isActive: true
+      }, employeeId);
+      await insertEmployees(client, [record]);
+      return record;
     });
-
+    if (!user) return res.status(400).json(formatResponse(false, 'Email already exists'));
     const employee = toEmployeeDto(user);
-
-    res.status(201).json(formatResponse(true, 'Employee created successfully', {
-      ...employee,
-      employee,
-      loginCredentials: {
-        employeeId: user.employeeId,
-        password: initialPassword
-      }
-    }));
-
+    return res.status(201).json(formatResponse(true, 'Employee created. A password setup email is queued.', { ...employee, employee }));
   } catch (error) {
-    console.error('Create employee error:', error);
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };
 
-// @desc    Get all employees
-// @route   GET /api/users
-// @access  Private (Manager, CEO)
-exports.getAllEmployees = async (req, res) => {
-  try {
-    const { department, role, search } = req.query;
+exports.getAllEmployees = listEmployees;
+exports.getEmployees = listEmployees;
 
-    let query = {};
-
-    if (req.user?.role === 'Team Lead') {
-      const currentUser = await User.findById(req.user.id).select('department');
-      query.department = normalizeDepartment(currentUser?.department || department);
-      query.role = 'Member';
-      query.isActive = true;
-    }
-
-    if (department && req.user?.role !== 'Team Lead') {
-      query.department = normalizeDepartment(department);
-    }
-
-    if (role && req.user?.role !== 'Team Lead') {
-      query.role = role;
-    }
-
-    if (search) {
-      query.$or = [
-        { firstName: { $regex: search, $options: 'i' } },
-        { lastName: { $regex: search, $options: 'i' } },
-        { employeeId: { $regex: search, $options: 'i' } },
-        { email: { $regex: search, $options: 'i' } }
-      ];
-    }
-
-    const employees = await User.find(query).select('-password').sort({ createdAt: -1 });
-
-    res.status(200).json(formatResponse(true, 'Employees fetched successfully', employees.map(toEmployeeDto)));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
-};
-
-// @desc    Get single employee
-// @route   GET /api/users/:id
-// @access  Private (Manager, CEO)
 exports.getEmployee = async (req, res) => {
   try {
-    const user = await User.findById(req.params.id).select('-password');
-
-    if (!user) {
-      return res.status(404).json(formatResponse(false, 'Employee not found'));
-    }
-
-    res.status(200).json(formatResponse(true, 'Employee fetched successfully', toEmployeeDto(user)));
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+    if (!scopesEmployee(req.user, user)) return res.status(403).json(formatResponse(false, 'You cannot view this employee'));
+    return res.json(formatResponse(true, 'Employee fetched successfully', await employeeDetails(user, req.user)));
   } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };
 
@@ -275,169 +241,127 @@ exports.hasRole = async (req, res) => {
   }
 };
 
-// @desc    Update employee
-// @route   PUT /api/users/:id
-// @access  Private (Manager, CEO)
 exports.updateEmployee = async (req, res) => {
   try {
-    const { firstName, lastName } = splitName(req.body);
-    const { email, phone, role, department, team, manager, joinDate, isActive, status, designation } = req.body;
-
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json(formatResponse(false, 'Employee not found'));
-    }
-
-    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user)) ||
-        (role && role !== user.role && !canAssignEmployeeRole(req.user.role, role))) {
-      return res.status(403).json(formatResponse(false, 'You cannot update this account'));
-    }
-    if ((isActive === false || (status && !['Active', 'active'].includes(status))) && !canTerminateUser(req.user, user)) {
-      return res.status(403).json(formatResponse(false, 'You cannot deactivate this employee'));
-    }
-
-    // Check if email is being changed and if it already exists
-    if (email && email !== user.email) {
-      const existingEmail = await User.findOne({ email: email.toLowerCase() });
-      if (existingEmail) {
-        return res.status(400).json(formatResponse(false, 'Email already exists'));
+    const body = req.body || {};
+    const result = await withEmployeeIdentityLock(async client => {
+      const { rows: [row] } = await client.query('SELECT data FROM users WHERE id = $1', [req.params.id]);
+      if (!row) return { status: 404, message: 'Employee not found' };
+      const user = row.data;
+      if (!canTerminateUser(req.user, user)) return { status: 403, message: 'You cannot update this account' };
+      const { fields, errors } = validateEmployeeFields(body, user);
+      if (errors.length) return { status: 400, message: errors[0], errors };
+      if (fields.email && await emailOwner(client, fields.email, req.params.id)) {
+        return { status: 400, message: 'Email already exists' };
       }
-      user.email = email.toLowerCase();
-    }
-
-    // Update fields
-    if (firstName) user.firstName = firstName;
-    if (lastName) user.lastName = lastName;
-    if (phone !== undefined) user.phone = phone;
-    if (role) user.role = role;
-    if (department) user.department = normalizeDepartment(department);
-    if (designation !== undefined) user.designation = designation;
-    if (team !== undefined) user.team = team;
-    if (manager !== undefined) user.manager = manager;
-    if (joinDate) user.joinDate = joinDate;
-    if (isActive !== undefined) user.isActive = isActive;
-    if (status) user.isActive = status === 'Active' || status === 'active';
-
-    await user.save();
-
-    res.status(200).json(formatResponse(true, 'Employee updated successfully', toEmployeeDto(user)));
-
+      const status = cleanText(body.status).toLowerCase();
+      if ('status' in body && !['active', 'inactive'].includes(status)) {
+        return { status: 400, message: 'Status must be Active or Inactive.' };
+      }
+      if ('isActive' in body && typeof body.isActive !== 'boolean') {
+        return { status: 400, message: 'isActive must be true or false.' };
+      }
+      const patch = { ...fields, updatedAt: new Date().toISOString() };
+      for (const property of ['team', 'manager', 'managerId']) {
+        if (Object.hasOwn(body, property)) patch[property] = cleanText(body[property]);
+      }
+      if (Object.hasOwn(patch, 'manager') && !Object.hasOwn(patch, 'managerId')) patch.managerId = '';
+      if ('firstName' in fields || 'lastName' in fields) {
+        patch.fullName = [fields.firstName ?? user.firstName, fields.lastName ?? user.lastName].join(' ');
+      }
+      if ('isActive' in body || status) {
+        patch.isActive = status ? status === 'active' : body.isActive;
+        if (patch.isActive === false) {
+          patch.isOnline = false;
+          if (user.isActive !== false) patch.passwordVersion = randomUUID();
+        }
+      }
+      const nextRole = effectiveRole({ ...user, ...patch });
+      if (nextRole !== effectiveRole(user) && !canChangeEmployeeRole(req.user, user, nextRole)) {
+        return { status: 403, message: 'You cannot assign this role' };
+      }
+      const employee = { ...user, ...patch };
+      await updateEmployees(client, [{ ...patch, userIdForUpdate: req.params.id }]);
+      return { status: 200, message: 'Employee updated successfully', employee };
+    });
+    return result.employee
+      ? res.json(formatResponse(true, result.message, await employeeDetails(result.employee, req.user)))
+      : res.status(result.status).json(formatResponse(false, result.message, result.errors));
   } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };
 
-// @desc    Reset employee password (Manager/CEO only)
-// @route   POST /api/users/:id/reset-password
-// @access  Private (Manager, CEO)
 exports.resetPassword = async (req, res) => {
   try {
-    const newPassword = req.body?.newPassword ?? generatePassword();
-    const policyError = passwordError(newPassword);
-    if (policyError) return res.status(400).json(formatResponse(false, policyError));
-
-    const user = await User.findById(req.params.id).select('+password');
-
-    if (!user) {
-      return res.status(404).json(formatResponse(false, 'Employee not found'));
-    }
-
-    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user))) {
+    const user = await User.findById(req.params.id);
+    if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+    if (!canTerminateUser(req.user, user)) {
       return res.status(403).json(formatResponse(false, 'You cannot reset this account'));
     }
-    // Update password
-    user.password = newPassword;
-    user.passwordChangedAt = Date.now();
-    await user.save();
-
-    res.status(200).json(formatResponse(true, 'Password reset successfully', {
-      employeeId: user.employeeId,
-      name: `${user.firstName} ${user.lastName}`,
-      newPassword: newPassword
-    }));
-
+    if (user.isActive === false) return res.status(400).json(formatResponse(false, 'Activate the employee before sending a password email.'));
+    const settings = emailSettings();
+    if (!settings) return res.status(503).json(formatResponse(false, 'Resend is unavailable. Check the server email settings.'));
+    if (!user.password && user.mustChangePassword) return exports.resendSetupEmail(req, res);
+    const result = await emailAdminResetLink(user.id, settings);
+    if (result === 'sent') return res.json(formatResponse(true, 'Password reset link sent to the employee.'));
+    if (result === 'failed') return res.status(502).json(formatResponse(false, 'Resend could not send the password reset email.'));
+    return res.status(429).json(formatResponse(false, 'A password email was requested recently. Try again later.'));
   } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };
 
-// @desc    Deactivate employee
-// @route   POST /api/users/:id/deactivate
-// @access  Private (Manager, CEO)
-exports.deactivateEmployee = async (req, res) => {
+exports.resendSetupEmail = async (req, res) => {
   try {
     const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json(formatResponse(false, 'Employee not found'));
-    }
-
-    if (!canTerminateUser(req.user, user)) {
-      return res.status(403).json(formatResponse(false, 'You cannot deactivate this employee'));
-    }
-    user.isActive = false;
-    await user.save();
-
-    res.status(200).json(formatResponse(true, 'Employee deactivated successfully'));
-
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
-};
-
-// @desc    Activate employee
-// @route   POST /api/users/:id/activate
-// @access  Private (Manager, CEO)
-exports.activateEmployee = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id);
-
-    if (!user) {
-      return res.status(404).json(formatResponse(false, 'Employee not found'));
-    }
-
-    if (!canAssignEmployeeRole(req.user.role, effectiveRole(user))) {
-      return res.status(403).json(formatResponse(false, 'You cannot activate this account'));
-    }
-    user.isActive = true;
-    await user.save();
-
-    res.status(200).json(formatResponse(true, 'Employee activated successfully'));
-
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
-};
-
-// ==================== /api/employees compatibility endpoints ====================
-
-exports.getEmployees = async (req, res) => {
-  try {
-    const employees = await User.find(buildEmployeeQuery(req.query, req.user))
-      .select('-password')
-      .sort({ createdAt: -1 });
-
-    res.status(200).json(formatResponse(true, 'Employees fetched successfully', employees.map(employee => ({ ...toEmployeeDto(employee), canDeactivate: canTerminateUser(req.user, employee) }))));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
-};
-
-exports.getEmployeeById = async (req, res) => {
-  try {
-    const user = await User.findById(req.params.id).select('-password');
     if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
-    res.status(200).json(formatResponse(true, 'Employee fetched successfully', toEmployeeDto(user)));
+    if (!canTerminateUser(req.user, user)) {
+      return res.status(403).json(formatResponse(false, 'You cannot send a setup link for this account'));
+    }
+    if (!emailSettings()) return res.status(503).json(formatResponse(false, 'Resend is unavailable. Check the server email settings.'));
+    const queued = await queueEmployeeSetupEmail(user.id);
+    if (!queued) return res.status(409).json(formatResponse(false, 'This account has finished setup, is inactive, or already has a setup email queued.'));
+    return res.status(202).json(formatResponse(true, 'A password setup email is queued.'));
   } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };
+
+function changeActiveState(active) {
+  return async (req, res) => {
+    try {
+      const result = await withEmployeeIdentityLock(async client => {
+        const { rows: [row] } = await client.query('SELECT data FROM users WHERE id = $1', [req.params.id]);
+        if (!row) return 404;
+        if (!canTerminateUser(req.user, row.data)) return 403;
+        const update = { userIdForUpdate: req.params.id, isActive: active, updatedAt: new Date().toISOString() };
+        if (!active) {
+          update.isOnline = false;
+          if (row.data.isActive !== false) update.passwordVersion = randomUUID();
+        }
+        await updateEmployees(client, [update]);
+        return 200;
+      });
+      const action = active ? 'activate' : 'deactivate';
+      if (result === 404) return res.status(404).json(formatResponse(false, 'Employee not found'));
+      if (result === 403) return res.status(403).json(formatResponse(false, `You cannot ${action} this employee`));
+      return res.json(formatResponse(true, `Employee ${action}d successfully`));
+    } catch (error) {
+      return employeeDirectoryError(res, error);
+    }
+  };
+}
+
+exports.deactivateEmployee = changeActiveState(false);
+exports.activateEmployee = changeActiveState(true);
+exports.getEmployeeById = exports.getEmployee;
 
 exports.getEmployeeByEmail = async (req, res) => {
   try {
     const user = await User.findOne({ email: req.params.email.toLowerCase() }).select('-password');
     if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+    if (!scopesEmployee(req.user, user)) return res.status(403).json(formatResponse(false, 'You cannot view this employee'));
     res.status(200).json(formatResponse(true, 'Employee fetched successfully', toEmployeeDto(user)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
@@ -448,6 +372,7 @@ exports.getEmployeeByEmployeeId = async (req, res) => {
   try {
     const user = await User.findOne({ employeeId: req.params.employeeId.toUpperCase() }).select('-password');
     if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+    if (!scopesEmployee(req.user, user)) return res.status(403).json(formatResponse(false, 'You cannot view this employee'));
     res.status(200).json(formatResponse(true, 'Employee fetched successfully', toEmployeeDto(user)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
@@ -501,7 +426,7 @@ exports.getEmployeeStats = async (req, res) => {
 exports.getEmployeesByDepartment = async (req, res) => {
   try {
     const employees = await User.find({ department: normalizeDepartment(req.params.department) }).select('-password').sort({ firstName: 1 });
-    res.status(200).json(formatResponse(true, 'Department employees fetched successfully', employees.map(toEmployeeDto)));
+    res.status(200).json(formatResponse(true, 'Department employees fetched successfully', employees.filter(user => scopesEmployee(req.user, user)).map(toEmployeeDto)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
   }
@@ -510,7 +435,7 @@ exports.getEmployeesByDepartment = async (req, res) => {
 exports.getEmployeesByRole = async (req, res) => {
   try {
     const employees = await User.find({ role: req.params.role }).select('-password').sort({ firstName: 1 });
-    res.status(200).json(formatResponse(true, 'Role employees fetched successfully', employees.map(toEmployeeDto)));
+    res.status(200).json(formatResponse(true, 'Role employees fetched successfully', employees.filter(user => scopesEmployee(req.user, user)).map(toEmployeeDto)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
   }
@@ -527,63 +452,66 @@ exports.getEmployeesByManager = async (req, res) => {
       ]
     }).select('-password').sort({ firstName: 1 });
 
-    res.status(200).json(formatResponse(true, 'Manager employees fetched successfully', employees.map(toEmployeeDto)));
+    res.status(200).json(formatResponse(true, 'Manager employees fetched successfully', employees.filter(user => scopesEmployee(req.user, user)).map(toEmployeeDto)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
   }
 };
 
-exports.searchEmployees = async (req, res) => {
-  try {
-    const employees = await User.find(buildEmployeeQuery({ search: req.query.q }, req.user))
-      .select('-password')
-      .sort({ firstName: 1 });
-
-    res.status(200).json(formatResponse(true, 'Employee search completed', employees.map(toEmployeeDto)));
-  } catch (error) {
-    res.status(500).json(formatResponse(false, error.message));
-  }
-};
+exports.searchEmployees = (req, res) => listEmployees({ ...req, query: { ...req.query, search: req.query.search ?? req.query.q } }, res);
 
 exports.deleteEmployee = async (req, res) => {
   try {
-    const targetUser = await User.findById(req.params.id);
-    if (!targetUser) return res.status(404).json(formatResponse(false, 'Employee not found'));
-
-    const actor = req.user;
-    const allowed = canTerminateUser(actor, targetUser);
-
-    if (!allowed) {
+    const { status, target } = await removeEmployee(req.params.id, req.user);
+    if (status === 404) return res.status(404).json(formatResponse(false, 'Employee not found'));
+    if (status === 403) {
       return res.status(403).json(formatResponse(false, 'You do not have permission to terminate this employee'));
     }
-
-    await User.findByIdAndDelete(req.params.id);
-
-    res.status(200).json(formatResponse(true, 'Employee permanently deleted', toEmployeeDto(targetUser)));
+    return res.json(formatResponse(true, 'Employee permanently deleted', toEmployeeDto(target)));
   } catch (error) {
     res.status(500).json(formatResponse(false, error.message));
   }
 };
 
+const defaultLeaveBalance = { Sick: 12, Casual: 10, Annual: 15, Emergency: 5, Other: 3 };
+
+async function currentLeaveBalance(user) {
+  const year = Number(businessDate().slice(0, 4));
+  const saved = await LeaveBalance.findOne({ userId: user.id, year });
+  return Object.fromEntries(Object.entries(defaultLeaveBalance).map(([type, defaultDays]) =>
+    [type, saved?.[type] ?? user.leaveBalance?.[type] ?? defaultDays]));
+}
+
 exports.getLeaveBalance = async (req, res) => {
-  res.status(200).json(formatResponse(true, 'Leave balance fetched successfully', {
-    Sick: 12,
-    Casual: 10,
-    Annual: 15,
-    Emergency: 5,
-    Other: 3
-  }));
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+  if (req.user.id !== user.id && !scopesEmployee(req.user, user)) {
+    return res.status(403).json(formatResponse(false, 'You cannot view this leave balance'));
+  }
+  return res.json(formatResponse(true, 'Leave balance fetched successfully', await currentLeaveBalance(user)));
 };
 
 exports.updateLeaveBalance = async (req, res) => {
-  res.status(200).json(formatResponse(true, 'Leave balance updated successfully', {
-    Sick: 12,
-    Casual: 10,
-    Annual: 15,
-    Emergency: 5,
-    Other: 3,
-    [req.body.leaveType]: Math.max(0, Number(req.body.days) || 0)
-  }));
+  const { leaveType, days } = req.body || {};
+  if (!Object.hasOwn(defaultLeaveBalance, leaveType) || !Number.isFinite(days) || days < 0) {
+    return res.status(400).json(formatResponse(false, 'Enter a valid leave type and a non-negative balance.'));
+  }
+  const user = await User.findById(req.params.id);
+  if (!user) return res.status(404).json(formatResponse(false, 'Employee not found'));
+  if (!canTerminateUser(req.user, user)) return res.status(403).json(formatResponse(false, 'You cannot edit this leave balance'));
+  const balances = { ...await currentLeaveBalance(user), [leaveType]: days };
+  const key = { userId: user.id, year: Number(businessDate().slice(0, 4)) };
+  await withEmployeeIdentityLock(async client => {
+    const { rows: [existing] } = await client.query(
+      "SELECT id FROM leave_balances WHERE data->>'userId' = $1 AND data->>'year' = $2 LIMIT 1",
+      [key.userId, String(key.year)]
+    );
+    await client.query(`
+      INSERT INTO leave_balances (id, data) VALUES ($1, $2)
+      ON CONFLICT (id) DO UPDATE SET data = leave_balances.data || $2::jsonb, updated_at = NOW()
+    `, [existing?.id || randomUUID(), JSON.stringify({ ...key, [leaveType]: days })]);
+  });
+  return res.json(formatResponse(true, 'Leave balance updated successfully', balances));
 };
 
 exports.uploadEmployeeDocument = async (req, res) => {
@@ -605,6 +533,20 @@ exports.uploadEmployeeDocument = async (req, res) => {
       return res.status(400).json(formatResponse(false, 'Document file is required'));
     }
 
+    const extension = extname(req.file.originalname).toLowerCase();
+    const bytes = req.file.buffer;
+    const signatures = {
+      '.pdf': Buffer.from('%PDF-'),
+      '.jpeg': Buffer.from([0xff, 0xd8, 0xff]), '.jpg': Buffer.from([0xff, 0xd8, 0xff]),
+      '.png': Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+      '.docx': Buffer.from([0x50, 0x4b, 0x03, 0x04])
+    };
+    const signature = signatures[extension];
+    if (!signature || !bytes.subarray(0, signature.length).equals(signature) ||
+        (extension === '.docx' && !bytes.includes(Buffer.from('word/document.xml')))) {
+      return res.status(400).json(formatResponse(false, 'Choose a valid PDF, JPG, PNG or DOCX document.'));
+    }
+
     if (!allowedTypes.includes(documentType)) {
       return res.status(400).json(formatResponse(false, 'Invalid document type'));
     }
@@ -614,6 +556,9 @@ exports.uploadEmployeeDocument = async (req, res) => {
       return res.status(404).json(formatResponse(false, 'Employee not found'));
     }
 
+    if (!canTerminateUser(req.user, user) && req.user.id !== user.id) {
+      return res.status(403).json(formatResponse(false, 'You cannot upload documents for this employee'));
+    }
     const accessToken = req.body.googleAccessToken || req.get('x-google-access-token');
     const driveFile = await uploadEmployeeDocumentToDrive({
       file: req.file,
@@ -637,7 +582,6 @@ exports.uploadEmployeeDocument = async (req, res) => {
     };
 
     user.documents = mergeEmployeeDocument(user.documents || {}, documentType, document);
-    user.markModified('documents');
     await user.save();
 
     const employee = applyDocumentToDto(toEmployeeDto(user), documentType, document);
@@ -646,40 +590,36 @@ exports.uploadEmployeeDocument = async (req, res) => {
       document
     }));
   } catch (error) {
-    console.error('Employee document upload error:', error);
-    res.status(500).json(formatResponse(false, error.message || 'Failed to upload employee document'));
+    console.error('Employee document upload error:', error.code || error.message);
+    res.status(503).json(formatResponse(false, 'Could not store the document in Google Drive. Check the Drive settings and try again.'));
   }
 };
 
-// @desc    Bulk import employees from spreadsheet rows (parsed client-side)
-// @route   POST /api/employees/import
-// @access  Private (CEO, COO, Manager, HR)
-// Body: { rows: [{ "Header": value, ... }], dryRun: true|false, updateExisting: true|false }
 exports.importEmployees = async (req, res) => {
   try {
-    const { rows, dryRun = true, updateExisting = false } = req.body || {};
+    const { sheet, dryRun = true, updateExisting = false } = req.body || {};
+    const workbook = req.file && await readEmployeeWorkbook(req.file.buffer, req.file.originalname, sheet);
+    const rows = workbook?.rows ?? req.body?.rows;
     if (!Array.isArray(rows) || rows.length === 0) {
-      return res.status(400).json(formatResponse(false, 'No rows to import'));
+      return res.status(400).json(formatResponse(false, workbook && !workbook.headerRow
+        ? 'The first 10 rows must contain headings for employee name and email.'
+        : 'No rows to import', workbook?.file));
     }
     if (rows.length > 2000) {
-      return res.status(400).json(formatResponse(false, 'Import is limited to 2000 rows at a time'));
+      return res.status(400).json(formatResponse(false, 'Import is limited to 2,000 employee rows.'));
     }
-
     const { importEmployees } = require('../services/employeeImportService');
     const result = await importEmployees(rows, {
-      dryRun: dryRun !== false,
-      updateExisting: Boolean(updateExisting),
+      dryRun: dryRun !== false && dryRun !== 'false',
+      updateExisting: updateExisting === true || updateExisting === 'true',
       importer: req.user
     });
-
     const { summary } = result;
     const message = result.dryRun
       ? `Preview: ${summary.toCreate} to create, ${summary.toUpdate} to update, ${summary.skipped} skipped, ${summary.errors} with errors`
       : `Imported: ${summary.toCreate} created, ${summary.toUpdate} updated, ${summary.skipped} skipped, ${summary.errors} with errors`;
-
-    res.status(200).json(formatResponse(true, message, result));
+    return res.json(formatResponse(true, message, { ...result, ...workbook?.file }));
   } catch (error) {
-    console.error('Employee import error:', error);
-    res.status(500).json(formatResponse(false, error.message));
+    return employeeDirectoryError(res, error);
   }
 };

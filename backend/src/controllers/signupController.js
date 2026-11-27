@@ -3,6 +3,7 @@ const { query } = require('../config/db');
 const { DEPARTMENTS } = require('../config/departments');
 const { emailSettings, sendEmail } = require('../services/emailService');
 const { emailSetupLink } = require('../services/passwordResetService');
+const { allocateEmployeeIds, withEmployeeIdentityLock } = require('../utils/employeeIds');
 const { formatResponse } = require('../utils/helpers');
 
 const validEmail = email => email.length <= 254 && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -35,20 +36,6 @@ const dto = row => ({
   setupStatus: row.setup_status
 });
 
-async function adminEmail() {
-  const configuredEmail = process.env.SIGNUP_ADMIN_EMAIL?.trim();
-  if (configuredEmail && validEmail(configuredEmail)) return configuredEmail;
-  const { rows: [admin] } = await query(`
-    SELECT data->>'email' AS email FROM users
-    WHERE data->>'role' = 'CEO'
-      AND (data->>'isActive') IS DISTINCT FROM 'false'
-      AND COALESCE(data->>'email', '') <> ''
-    ORDER BY created_at
-    LIMIT 1
-  `);
-  return admin?.email && validEmail(admin.email) ? admin.email : null;
-}
-
 exports.signup = async (req, res) => {
   const { name, email, department } = req.body || {};
   const fullName = typeof name === 'string' ? name.trim() : '';
@@ -57,20 +44,21 @@ exports.signup = async (req, res) => {
     return res.status(400).json(formatResponse(false, 'Enter your name, a valid email address and your department.'));
   }
   const settings = emailSettings();
-  const admin = settings && await adminEmail();
+  const admin = process.env.SIGNUP_ADMIN_EMAIL?.trim();
+  const notifyAdmin = Boolean(settings && admin && validEmail(admin));
 
   const { rows: [request] } = await query(`
     INSERT INTO signup_requests (id, email, full_name, department, last_notification_attempt)
     SELECT $1, $2, $3, $4, CASE WHEN $5::boolean THEN NOW() END
-    WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(data->>'email') = $2)
+    WHERE NOT EXISTS (SELECT 1 FROM users WHERE LOWER(BTRIM(data->>'email')) = $2)
     ON CONFLICT (email) DO UPDATE SET last_notification_attempt = NOW()
     WHERE $5::boolean AND signup_requests.status = 'pending' AND signup_requests.admin_notified_at IS NULL
       AND (signup_requests.last_notification_attempt IS NULL
            OR signup_requests.last_notification_attempt < NOW() - INTERVAL '60 seconds')
     RETURNING id, email, full_name, department
-  `, [randomBytes(12).toString('hex'), address, fullName, department, Boolean(admin)]);
+  `, [randomBytes(12).toString('hex'), address, fullName, department, notifyAdmin]);
 
-  if (request && admin) {
+  if (request && notifyAdmin) {
     try {
       await sendEmail(settings, {
         to: admin,
@@ -79,7 +67,7 @@ exports.signup = async (req, res) => {
       });
       await query('UPDATE signup_requests SET admin_notified_at = NOW() WHERE id = $1', [request.id]);
     } catch (error) {
-      console.error('Signup admin email delivery failed:', error.message);
+      console.error('Signup admin email delivery failed:', error?.message);
     }
   }
 
@@ -96,17 +84,26 @@ exports.approve = async (req, res) => {
   if (!settings) return res.status(503).json(formatResponse(false, 'Configure Resend before approving signup requests.'));
 
   const userId = randomBytes(12).toString('hex');
-  const { rows: [account] } = await query(`
-    WITH approved AS (
-      UPDATE signup_requests
-      SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(), user_id = $3,
-          employee_id = 'INTS' || nextval('signup_employee_ids')::text
+  const account = await withEmployeeIdentityLock(async client => {
+    const { rows: [eligible] } = await client.query(`
+      SELECT id FROM signup_requests
       WHERE id = $1 AND (
         status = 'pending' OR (
           status = 'approved' AND NOT EXISTS (SELECT 1 FROM users WHERE id = signup_requests.user_id)
         )
       )
-        AND NOT EXISTS (SELECT 1 FROM users WHERE LOWER(data->>'email') = signup_requests.email)
+        AND NOT EXISTS (SELECT 1 FROM users WHERE LOWER(BTRIM(data->>'email')) = signup_requests.email)
+      FOR UPDATE
+    `, [req.params.id]);
+    if (!eligible) return null;
+
+    const [employeeId] = await allocateEmployeeIds('Member', 1, client);
+    const { rows: [created] } = await client.query(`
+    WITH approved AS (
+      UPDATE signup_requests
+      SET status = 'approved', reviewed_by = $2, reviewed_at = NOW(), user_id = $3,
+          employee_id = $4
+      WHERE id = $1
       RETURNING email, full_name, department, employee_id
     )
     INSERT INTO users (id, data)
@@ -117,10 +114,17 @@ exports.approve = async (req, res) => {
       'signupDepartment', department, 'role', 'Member', 'isActive', true,
       'isOnline', false, 'createdAt', NOW(), 'updatedAt', NOW()
     ) FROM approved RETURNING data->>'employeeId' AS "employeeId"
-  `, [req.params.id, req.user.id, userId]);
+    `, [req.params.id, req.user.id, userId, employeeId]);
+    return created;
+  });
   if (!account) return res.status(409).json(formatResponse(false, 'This request already has a decision or the email belongs to an existing account.'));
 
-  const emailSent = (await emailSetupLink(userId, settings)) === 'sent';
+  let emailSent = false;
+  try {
+    emailSent = (await emailSetupLink(userId, settings)) === 'sent';
+  } catch (error) {
+    console.error('Signup setup email failed:', error?.message);
+  }
   const message = emailSent
     ? 'Signup approved and setup email sent.'
     : 'Signup approved, but the setup email could not be sent. Check the Resend settings, then select Resend setup link.';

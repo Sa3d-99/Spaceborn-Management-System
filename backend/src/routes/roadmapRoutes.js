@@ -5,7 +5,6 @@ const path = require('path');
 const multer = require('multer');
 
 const Roadmap = require('../models/Roadmap');
-const Task = require('../models/Task');
 const { protect } = require('../middleware/authMiddleware');
 const { notifyMvpSubmitted } = require('../utils/notificationDispatcher');
 
@@ -24,7 +23,14 @@ const storage = multer.diskStorage({
 
 const upload = multer({
   storage,
-  limits: { fileSize: 10 * 1024 * 1024 }
+  limits: { fileSize: 10 * 1024 * 1024 + 1 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['.pdf', '.png', '.jpg', '.jpeg', '.docx', '.xlsx', '.pptx'];
+    if (allowed.includes(path.extname(file.originalname).toLowerCase())) return cb(null, true);
+    const error = new Error('Upload a PDF, PNG, JPG, DOCX, XLSX, or PPTX file.');
+    error.code = 'UNSUPPORTED_FILE_TYPE';
+    return cb(error);
+  }
 });
 
 const toDto = (roadmap) => ({
@@ -51,71 +57,16 @@ const toDto = (roadmap) => ({
   createdAt: roadmap.createdAt
 });
 
-const defaultRoadmapForDepartment = async (department, user) => {
-  const tasks = await Task.find({ department }).lean();
-  const completed = tasks.filter((task) => task.status === 'Completed').length;
-  const progress = tasks.length ? Math.round((completed / tasks.length) * 100) : 0;
-  const today = new Date();
-  const target = new Date();
-  target.setMonth(target.getMonth() + 3);
-
-  return {
-    id: `default-${department}`,
-    title: `${department || 'Team'} MVP Roadmap`,
-    version: '1.0',
-    description: `Delivery roadmap generated from ${department || 'team'} task progress.`,
-    department,
-    startDate: today.toISOString().split('T')[0],
-    targetDate: target.toISOString().split('T')[0],
-    lastUpdated: new Date().toISOString(),
-    status: 'active',
-    sharedWith: ['CEO', 'COO', 'Manager'],
-    sharedAt: new Date().toISOString(),
-    sharedBy: {
-      id: String(user._id),
-      name: user.name,
-      role: user.role,
-      email: user.email,
-      avatar: initials(user.name)
-    },
-    overallProgress: progress,
-    milestones: [
-      { id: 1, title: 'Foundation', dueDate: today.toISOString().split('T')[0], status: 'completed', description: 'Core setup and planning', progress: 100 },
-      { id: 2, title: 'Delivery Execution', dueDate: target.toISOString().split('T')[0], status: progress >= 100 ? 'completed' : 'in-progress', description: 'Complete assigned task delivery', progress }
-    ],
-    features: tasks.slice(0, 6).map((task, index) => ({
-      id: index + 1,
-      name: task.title,
-      priority: task.priority || 'medium',
-      status: task.status === 'Completed' ? 'completed' : 'in-progress'
-    })),
-    risks: tasks.filter((task) => task.status === 'Overdue').slice(0, 3).map((task, index) => ({
-      id: index + 1,
-      description: task.title,
-      impact: 'high',
-      mitigation: 'Review blocker and reassign if needed',
-      status: 'monitoring',
-      owner: task.assignedToName || 'Team'
-    })),
-    weeklyUpdates: [],
-    attachments: []
-  };
-};
-
 router.use(protect);
 
 router.get('/shared', async (req, res) => {
   try {
     const canViewAll = ['CEO', 'COO'].includes(req.user.role);
     const department = req.query.department || (canViewAll ? '' : req.user.department || '');
-    let roadmaps = await Roadmap.find({
+    const roadmaps = await Roadmap.find({
       ...(department ? { department } : {}),
       status: { $in: ['shared', 'active'] }
     }).sort({ updatedAt: -1 });
-
-    if (roadmaps.length === 0) {
-      return res.json([await defaultRoadmapForDepartment(department, req.user)]);
-    }
 
     res.json(roadmaps.map(toDto));
   } catch (error) {
@@ -130,10 +81,6 @@ router.get('/', async (req, res) => {
     if (req.query.status) query.status = req.query.status;
 
     const roadmaps = await Roadmap.find(query).sort({ updatedAt: -1 });
-    if (roadmaps.length === 0 && req.query.department) {
-      return res.json({ success: true, data: [await defaultRoadmapForDepartment(req.query.department, req.user)] });
-    }
-
     res.json({ success: true, data: roadmaps.map(toDto) });
   } catch (error) {
     res.status(500).json({ success: false, message: error.message || 'Failed to fetch roadmaps' });
@@ -193,6 +140,10 @@ router.put('/:id', async (req, res) => {
 router.post('/:id/attachments', upload.single('file'), async (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ success: false, message: 'No file uploaded' });
+    if (req.file.size > 10 * 1024 ** 2) {
+      await fs.promises.unlink(req.file.path);
+      return res.status(413).json({ success: false, message: 'File size must be 10 MB or less.' });
+    }
 
     const attachment = {
       id: `${Date.now()}-${Math.round(Math.random() * 1e9)}`,
